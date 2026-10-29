@@ -1,173 +1,160 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import "./App.css";
+
+const crops = ["Banana", "Coconut"];
+
+const labels = {
+  en: {
+    dashboard: "Overview",
+    diagnosis: "Crop diagnosis",
+    market: "Market trends",
+    profile: "Farmer profile",
+    welcome: "Your farm, better informed.",
+    subtitle: "Crop health and market insights in one place.",
+    diagnose: "Diagnose a crop",
+    prices: "Explore market trends",
+    chooseCrop: "Choose your crop",
+    takePhoto: "Take a photo",
+    gallery: "Choose from gallery",
+    analyze: "Analyze image",
+    noModel: "AI model not connected yet",
+    noModelText:
+      "Your photo is ready. Connect the trained crop model to obtain a genuine disease prediction.",
+    recommendation: "Diagnosis & recommendations",
+    recommendationText:
+      "Disease-specific treatment guidance will appear here after a supported diagnosis. Do not apply chemicals based on an unverified result.",
+    marketText:
+      "Market price data is not connected yet. Connect a verified source such as AGMARKNET before displaying prices or trends.",
+    profileText: "Update your farmer information.",
+    name: "Full name",
+    phone: "Phone",
+    district: "District",
+    village: "Village / town",
+    land: "Land size (acres)",
+    ownership: "Land ownership",
+    owned: "Owned",
+    leased: "Leased",
+    other: "Other",
+    save: "Save profile",
+    saved: "Profile saved.",
+    logout: "Sign out",
+    login: "Sign in",
+    signup: "Create account",
+    email: "Email",
+    password: "Password",
+    switchSignup: "New here? Create an account",
+    switchLogin: "Already registered? Sign in",
+    language: "தமிழ்",
+    loading: "Please wait...",
+    error: "Something went wrong.",
+    selectPhoto: "Select a crop photo to get started.",
+    signInHeading: "Welcome to AGRISENSE",
+    signInText: "Crop health and farmer support, designed for you.",
+    confirm: "Check your email to confirm your account, then sign in.",
+    schemes: "Farmer support",
+    schemesText: "Your profile will help prepare for relevant scheme matching.",
+    recovery: "Recovery tracking",
+    recoveryText: "Follow-up photo tracking will be added after diagnosis.",
+    back: "Back",
+    cameraHint: "Use a clear, well-lit photo of the affected leaf or plant.",
+  },
+  ta: {
+    dashboard: "முகப்பு",
+    diagnosis: "பயிர் நோய் கண்டறிதல்",
+    market: "சந்தை போக்குகள்",
+    profile: "விவசாயி விவரங்கள்",
+    welcome: "உங்கள் பண்ணை, சிறந்த தகவல்களுடன்.",
+    subtitle: "பயிர் ஆரோக்கியம் மற்றும் சந்தைத் தகவல்கள் ஒரே இடத்தில்.",
+    diagnose: "பயிரைச் சோதிக்கவும்",
+    prices: "சந்தை போக்குகளைப் பார்க்கவும்",
+    chooseCrop: "பயிரைத் தேர்வு செய்யவும்",
+    takePhoto: "புகைப்படம் எடுக்கவும்",
+    gallery: "புகைப்படத்தைத் தேர்வு செய்யவும்",
+    analyze: "படத்தைப் பகுப்பாய்வு செய்",
+    noModel: "AI மாதிரி இன்னும் இணைக்கப்படவில்லை",
+    noModelText:
+      "உங்கள் புகைப்படம் தயாராக உள்ளது. உண்மையான நோய் கணிப்புக்கு பயிற்சியளிக்கப்பட்ட மாதிரியை இணைக்க வேண்டும்.",
+    recommendation: "நோய் விளக்கம் மற்றும் பரிந்துரைகள்",
+    recommendationText:
+      "உறுதிப்படுத்தப்பட்ட நோய் கண்டறிதலுக்குப் பிறகு சிகிச்சை வழிகாட்டுதல் வழங்கப்படும். உறுதிப்படுத்தப்படாத முடிவின் அடிப்படையில் மருந்துகளைப் பயன்படுத்த வேண்டாம்.",
+    marketText:
+      "சந்தை விலைத் தரவு இன்னும் இணைக்கப்படவில்லை. விலை மற்றும் போக்குகளைக் காட்ட AGMARKNET போன்ற நம்பகமான ஆதாரத்தை இணைக்க வேண்டும்.",
+    profileText: "உங்கள் விவசாயி விவரங்களைப் புதுப்பிக்கவும்.",
+    name: "முழுப் பெயர்",
+    phone: "தொலைபேசி",
+    district: "மாவட்டம்",
+    village: "கிராமம் / நகரம்",
+    land: "நில அளவு (ஏக்கர்)",
+    ownership: "நில உரிமை",
+    owned: "சொந்த நிலம்",
+    leased: "குத்தகை",
+    other: "மற்றவை",
+    save: "சேமிக்கவும்",
+    saved: "விவரங்கள் சேமிக்கப்பட்டன.",
+    logout: "வெளியேறு",
+    login: "உள்நுழைக",
+    signup: "கணக்கை உருவாக்கு",
+    email: "மின்னஞ்சல்",
+    password: "கடவுச்சொல்",
+    switchSignup: "புதிய பயனரா? கணக்கை உருவாக்கவும்",
+    switchLogin: "ஏற்கனவே கணக்கு உள்ளதா? உள்நுழைக",
+    language: "English",
+    loading: "தயவுசெய்து காத்திருக்கவும்...",
+    error: "பிழை ஏற்பட்டது.",
+    selectPhoto: "தொடங்க பயிரின் புகைப்படத்தைத் தேர்ந்தெடுக்கவும்.",
+    signInHeading: "AGRISENSE-க்கு வரவேற்கிறோம்",
+    signInText: "உங்களுக்கான பயிர் ஆரோக்கியம் மற்றும் விவசாயி ஆதரவு.",
+    confirm: "மின்னஞ்சலை உறுதிப்படுத்தி உள்நுழையவும்.",
+    schemes: "விவசாயி ஆதரவு",
+    schemesText: "திட்டப் பொருத்தத்தை உருவாக்க உங்கள் விவரங்கள் உதவும்.",
+    recovery: "மீட்பு கண்காணிப்பு",
+    recoveryText: "நோய் கண்டறிதலுக்குப் பிறகு புகைப்படக் கண்காணிப்பு சேர்க்கப்படும்.",
+    back: "திரும்பு",
+    cameraHint: "பாதிக்கப்பட்ட இலையை அல்லது செடியைத் தெளிவாகப் புகைப்படம் எடுக்கவும்.",
+  },
+};
 
 const emptyProfile = {
   full_name: "",
   phone: "",
-  preferred_language: "en",
-  state: "Tamil Nadu",
   district: "",
   village: "",
   crops: [],
   land_size_acres: "",
-  farmer_category: "",
   land_ownership: "",
-};
-
-const words = {
-  en: {
-    brand: "AGRISENSE",
-    tagline: "Smarter farming starts here.",
-    login: "Welcome back",
-    signup: "Create your account",
-    loginSub: "Sign in to continue to your farmer dashboard.",
-    signupSub: "Join AGRISENSE to access crop health and farmer support tools.",
-    name: "Full name",
-    email: "Email address",
-    password: "Password",
-    phone: "Phone number",
-    signIn: "Sign in",
-    signUp: "Create account",
-    noAccount: "New to AGRISENSE?",
-    haveAccount: "Already have an account?",
-    create: "Sign up",
-    switchLogin: "Sign in",
-    dashboard: "Farmer dashboard",
-    welcome: "Welcome",
-    profile: "Farmer profile",
-    profileSub: "Complete your details for more relevant scheme recommendations.",
-    district: "District",
-    village: "Village / Town",
-    crops: "Crops you grow",
-    banana: "Banana",
-    coconut: "Coconut",
-    land: "Land size (acres)",
-    category: "Farmer category",
-    small: "Small farmer",
-    marginal: "Marginal farmer",
-    other: "Other",
-    ownership: "Land ownership",
-    owned: "Owned",
-    leased: "Leased",
-    shared: "Shared / Other",
-    save: "Save profile",
-    saved: "Profile saved successfully.",
-    logout: "Sign out",
-    diagnosis: "Crop disease detection",
-    diagnosisSub: "Upload a crop photo to begin diagnosis when the AI model is connected.",
-    prices: "Market price insights",
-    pricesSub: "Compare market prices for your crops.",
-    schemes: "Schemes & insurance",
-    schemesSub: "Explore support relevant to your farmer profile.",
-    recovery: "Recovery tracking",
-    recoverySub: "Track crop recovery with follow-up photos.",
-    language: "Language",
-    loading: "Loading...",
-    confirm: "Account created. Check your email for a confirmation link, then sign in.",
-    error: "Something went wrong.",
-    chooseCrop: "Select at least one crop.",
-    saveError: "Could not save your profile. Please try again.",
-  },
-  ta: {
-    brand: "AGRISENSE",
-    tagline: "திறமையான விவசாயம் இங்கே தொடங்குகிறது.",
-    login: "மீண்டும் வரவேற்கிறோம்",
-    signup: "கணக்கை உருவாக்கவும்",
-    loginSub: "விவசாயி டாஷ்போர்டைத் தொடர உள்நுழையவும்.",
-    signupSub: "பயிர் ஆரோக்கியம் மற்றும் விவசாயி ஆதரவு வசதிகளைப் பெற இணையுங்கள்.",
-    name: "முழுப் பெயர்",
-    email: "மின்னஞ்சல் முகவரி",
-    password: "கடவுச்சொல்",
-    phone: "தொலைபேசி எண்",
-    signIn: "உள்நுழைக",
-    signUp: "கணக்கை உருவாக்கு",
-    noAccount: "புதிய AGRISENSE பயனரா?",
-    haveAccount: "ஏற்கனவே கணக்கு உள்ளதா?",
-    create: "பதிவு செய்க",
-    switchLogin: "உள்நுழைக",
-    dashboard: "விவசாயி டாஷ்போர்டு",
-    welcome: "வணக்கம்",
-    profile: "விவசாயி விவரங்கள்",
-    profileSub: "பொருத்தமான திட்டப் பரிந்துரைகளுக்காக உங்கள் விவரங்களை நிரப்பவும்.",
-    district: "மாவட்டம்",
-    village: "கிராமம் / நகரம்",
-    crops: "நீங்கள் பயிரிடும் பயிர்கள்",
-    banana: "வாழை",
-    coconut: "தென்னை",
-    land: "நில அளவு (ஏக்கர்)",
-    category: "விவசாயி வகை",
-    small: "சிறு விவசாயி",
-    marginal: "குறு விவசாயி",
-    other: "மற்றவை",
-    ownership: "நில உரிமை",
-    owned: "சொந்த நிலம்",
-    leased: "குத்தகை",
-    shared: "பகிர்வு / மற்றவை",
-    save: "விவரங்களைச் சேமி",
-    saved: "விவரங்கள் வெற்றிகரமாகச் சேமிக்கப்பட்டன.",
-    logout: "வெளியேறு",
-    diagnosis: "பயிர் நோய் கண்டறிதல்",
-    diagnosisSub: "AI மாதிரி இணைக்கப்பட்டதும் பயிர் புகைப்படத்தைப் பதிவேற்றலாம்.",
-    prices: "சந்தை விலை விவரங்கள்",
-    pricesSub: "உங்கள் பயிர்களின் சந்தை விலைகளை ஒப்பிடுங்கள்.",
-    schemes: "அரசுத் திட்டங்கள் மற்றும் காப்பீடு",
-    schemesSub: "உங்கள் விவரங்களுக்குப் பொருத்தமான உதவித் திட்டங்களைப் பாருங்கள்.",
-    recovery: "மீட்பு கண்காணிப்பு",
-    recoverySub: "தொடர்புப் புகைப்படங்கள் மூலம் பயிர் மீட்சியைக் கண்காணியுங்கள்.",
-    language: "மொழி",
-    loading: "ஏற்றப்படுகிறது...",
-    confirm: "கணக்கு உருவாக்கப்பட்டது. மின்னஞ்சலை உறுதிப்படுத்தி, பின்னர் உள்நுழையவும்.",
-    error: "பிழை ஏற்பட்டது.",
-    chooseCrop: "குறைந்தது ஒரு பயிரையாவது தேர்வு செய்யவும்.",
-    saveError: "விவரங்களைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-  },
+  preferred_language: "en",
 };
 
 function App() {
   const [language, setLanguage] = useState("en");
-  const [mode, setMode] = useState("login");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [page, setPage] = useState("dashboard");
+  const [form, setForm] = useState({ full_name: "", email: "", password: "" });
   const [profile, setProfile] = useState(emptyProfile);
-
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    password: "",
-    phone: "",
-  });
-
-  const t = words[language];
+  const [crop, setCrop] = useState("Banana");
+  const [photo, setPhoto] = useState(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
+  const t = labels[language];
 
   useEffect(() => {
     let active = true;
-
-    async function loadSession() {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!active) return;
-
-      if (error) {
-        setMessage(error.message);
-        setIsError(true);
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) {
+        setUser(data.session?.user ?? null);
+        setLoading(false);
       }
-
-      setUser(data?.session?.user ?? null);
-      setLoading(false);
-    }
-
-    loadSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
     });
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => setUser(session?.user ?? null)
+    );
     return () => {
       active = false;
       subscription.unsubscribe();
@@ -176,84 +163,70 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-
     let active = true;
-
     async function loadProfile() {
       const { data, error } = await supabase
         .from("farmer_profiles")
         .select("*")
         .eq("id", user.id)
         .maybeSingle();
-
       if (!active) return;
-
       if (data) {
-        setProfile({
-          ...emptyProfile,
-          ...data,
-          crops: data.crops ?? [],
-          land_size_acres: data.land_size_acres ?? "",
-        });
+        setProfile({ ...emptyProfile, ...data, crops: data.crops ?? [] });
       } else if (!error) {
-        const metadata = user.user_metadata ?? {};
-
         setProfile({
           ...emptyProfile,
-          full_name: metadata.full_name ?? user.email?.split("@")[0] ?? "",
-          phone: metadata.phone ?? "",
-          district: metadata.district ?? "",
-          village: metadata.village ?? "",
-          crops: metadata.crops ?? [],
-          land_size_acres: metadata.land_size_acres ?? "",
-          farmer_category: metadata.farmer_category ?? "",
-          land_ownership: metadata.land_ownership ?? "",
-          preferred_language: metadata.preferred_language ?? language,
+          full_name: user.user_metadata?.full_name ?? "",
+          phone: user.user_metadata?.phone ?? "",
+          preferred_language: language,
         });
       } else {
         setMessage(error.message);
         setIsError(true);
       }
     }
-
     loadProfile();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [user]);
 
-  function updateForm(event) {
+  useEffect(() => {
+    return () => {
+      if (photo?.url) URL.revokeObjectURL(photo.url);
+    };
+  }, [photo]);
+
+  function setField(event) {
     setForm({ ...form, [event.target.name]: event.target.value });
   }
 
-  function updateProfile(event) {
-    const { name, value } = event.target;
-    setProfile((current) => ({ ...current, [name]: value }));
+  function setProfileField(event) {
+    setProfile({ ...profile, [event.target.name]: event.target.value });
   }
 
-  function toggleCrop(crop) {
-    setProfile((current) => ({
-      ...current,
-      crops: current.crops.includes(crop)
-        ? current.crops.filter((item) => item !== crop)
-        : [...current.crops, crop],
-    }));
-  }
-
-  async function handleAuth(event) {
-    event.preventDefault();
-    setMessage("");
-    setIsError(false);
-
-    if (mode === "signup" && !form.full_name.trim()) {
-      setMessage("Please enter your full name.");
+  function choosePhoto(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setMessage("Please choose an image file.");
       setIsError(true);
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage("Please choose an image smaller than 10 MB.");
+      setIsError(true);
+      return;
+    }
+    setPhoto({ file, url: URL.createObjectURL(file) });
+    setMessage("");
+    setIsError(false);
+  }
 
-    setSubmitting(true);
-
+  async function authenticate(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setIsError(false);
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -261,20 +234,12 @@ function App() {
           password: form.password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: {
-              full_name: form.full_name.trim(),
-              phone: form.phone.trim(),
-              preferred_language: language,
-              crops: [],
-            },
+            data: { full_name: form.full_name.trim(), preferred_language: language },
           },
         });
-
         if (error) throw error;
-
         if (data.session) {
           setUser(data.user);
-          setMessage("Account created successfully.");
         } else {
           setMode("login");
           setMessage(t.confirm);
@@ -284,419 +249,197 @@ function App() {
           email: form.email.trim(),
           password: form.password,
         });
-
         if (error) throw error;
       }
     } catch (error) {
       setMessage(error.message || t.error);
       setIsError(true);
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   }
 
   async function saveProfile(event) {
     event.preventDefault();
+    setBusy(true);
     setMessage("");
-    setIsError(false);
-
-    if (!profile.crops.length) {
-      setMessage(t.chooseCrop);
-      setIsError(true);
-      return;
-    }
-
-    setSubmitting(true);
-
     const payload = {
       id: user.id,
       full_name: profile.full_name.trim(),
-      phone: profile.phone.trim() || null,
+      phone: profile.phone || null,
       preferred_language: language,
-      state: profile.state || "Tamil Nadu",
-      district: profile.district.trim() || null,
-      village: profile.village.trim() || null,
-      crops: profile.crops,
-      land_size_acres:
-        profile.land_size_acres === "" ? null : Number(profile.land_size_acres),
-      farmer_category: profile.farmer_category || null,
+      state: "Tamil Nadu",
+      district: profile.district || null,
+      village: profile.village || null,
+      crops: profile.crops || [],
+      land_size_acres: profile.land_size_acres === "" ? null : Number(profile.land_size_acres),
       land_ownership: profile.land_ownership || null,
       updated_at: new Date().toISOString(),
     };
-
-    const { error } = await supabase
-      .from("farmer_profiles")
-      .upsert(payload, { onConflict: "id" });
-
-    setSubmitting(false);
-
-    if (error) {
-      setMessage(`${t.saveError} ${error.message}`);
-      setIsError(true);
-      return;
-    }
-
-    setProfile((current) => ({
-      ...current,
-      ...payload,
-      land_size_acres: payload.land_size_acres ?? "",
-    }));
-    setMessage(t.saved);
+    const { error } = await supabase.from("farmer_profiles").upsert(payload);
+    setBusy(false);
+    setMessage(error ? error.message : t.saved);
+    setIsError(Boolean(error));
   }
 
-  async function handleLogout() {
+  async function logout() {
     const { error } = await supabase.auth.signOut();
-
     if (error) {
       setMessage(error.message);
       setIsError(true);
-      return;
+    } else {
+      setUser(null);
+      setPage("dashboard");
+      setPhoto(null);
+      setMessage("");
     }
-
-    setUser(null);
-    setProfile(emptyProfile);
-    setMessage("");
-    setMode("login");
   }
 
-  if (loading) {
-    return <main className="app-loading">{t.loading}</main>;
+  if (loading) return <div className="loading-screen">{t.loading}</div>;
+
+  if (!user) {
+    return (
+      <main className="auth-screen">
+        <section className="auth-story">
+          <div className="brand"><span className="brand-icon">A</span> AGRISENSE</div>
+          <span className="eyebrow">CROP HEALTH · FARMER WELFARE</span>
+          <h1>{t.signInHeading}</h1>
+          <p>{t.signInText}</p>
+          <div className="story-tags"><span>01 · Crop health</span><span>02 · Market insights</span><span>03 · Farmer support</span></div>
+        </section>
+        <section className="auth-panel">
+          <div className="language-switch">
+            <button onClick={() => setLanguage(language === "en" ? "ta" : "en")}>{t.language}</button>
+          </div>
+          <h2>{mode === "login" ? t.login : t.signup}</h2>
+          <p className="muted">{t.signInText}</p>
+          <form onSubmit={authenticate} className="form-stack">
+            {mode === "signup" && <label>{t.name}<input name="full_name" value={form.full_name} onChange={setField} required maxLength={100} /></label>}
+            <label>{t.email}<input name="email" type="email" value={form.email} onChange={setField} required autoComplete="email" /></label>
+            <label>{t.password}<input name="password" type="password" value={form.password} onChange={setField} required minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+            {message && <p className={isError ? "alert error" : "alert"}>{message}</p>}
+            <button className="primary-button full-width" disabled={busy}>{busy ? t.loading : mode === "login" ? t.login : t.signup}</button>
+          </form>
+          <button className="text-button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(""); }}>{mode === "login" ? t.switchSignup : t.switchLogin}</button>
+        </section>
+      </main>
+    );
   }
+
+  const navItems = [
+    { id: "dashboard", icon: "⌂", label: t.dashboard },
+    { id: "diagnosis", icon: "⌕", label: t.diagnosis },
+    { id: "market", icon: "↗", label: t.market },
+    { id: "profile", icon: "○", label: t.profile },
+  ];
 
   return (
-    <main className="agr-app">
-      <header className="topbar">
-        <a className="brand" href="#home" aria-label="AGRISENSE home">
-          <span className="brand-mark">A</span>
-          <span>{t.brand}</span>
-        </a>
-
-        <div className="topbar-actions">
-          <label className="language-control">
-            <span>{t.language}</span>
-            <select
-              value={language}
-              onChange={(event) => {
-                const nextLanguage = event.target.value;
-                setLanguage(nextLanguage);
-                setProfile((current) => ({
-                  ...current,
-                  preferred_language: nextLanguage,
-                }));
-              }}
-            >
-              <option value="en">English</option>
-              <option value="ta">தமிழ்</option>
-            </select>
-          </label>
-
-          {user && (
-            <button className="button button-outline" onClick={handleLogout}>
-              {t.logout}
+    <div className="app-shell">
+      <aside className="sidebar">
+        <a className="brand" href="#top"><span className="brand-icon">A</span> AGRISENSE</a>
+        <div className="side-caption">FARMER WORKSPACE</div>
+        <nav>
+          {navItems.map((item) => (
+            <button key={item.id} className={`nav-item ${page === item.id ? "active" : ""}`} onClick={() => { setPage(item.id); setMessage(""); }}>
+              <span className="nav-icon">{item.icon}</span><span>{item.label}</span>
             </button>
-          )}
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <span className="avatar">{(profile.full_name || user.email || "F").slice(0, 1).toUpperCase()}</span>
+          <div className="user-mini"><strong>{profile.full_name || user.email}</strong><small>Farmer account</small></div>
+          <button className="logout-button" onClick={logout} aria-label={t.logout}>↪</button>
         </div>
-      </header>
+      </aside>
 
-      {!user ? (
-        <section className="auth-layout" id="home">
-          <div className="auth-intro">
-            <span className="eyebrow">CROP HEALTH · FARMER WELFARE</span>
-            <h1>{t.tagline}</h1>
-            <p>
-              Practical crop-health support and farmer-focused tools for
-              banana and coconut cultivation.
-            </p>
+      <main className="main-panel" id="top">
+        <header className="page-topbar">
+          <div><span className="eyebrow">AGRISENSE / FARMER WORKSPACE</span><p>Practical insights for your farm</p></div>
+          <button className="language-pill" onClick={() => setLanguage(language === "en" ? "ta" : "en")}>{language === "en" ? "தமிழ்" : "English"}</button>
+        </header>
 
-            <div className="auth-benefits">
-              <div><span>01</span> {t.diagnosis}</div>
-              <div><span>02</span> {t.schemes}</div>
-              <div><span>03</span> {t.prices}</div>
+        {page === "dashboard" && (
+          <section className="page-content">
+            <div className="welcome-banner">
+              <div><span className="eyebrow light">YOUR FARM · YOUR DECISIONS</span><h1>{t.welcome}</h1><p>{t.subtitle}</p><button className="gold-button" onClick={() => setPage("diagnosis")}>{t.diagnose} <span>→</span></button></div>
+              <div className="banner-illustration" aria-hidden="true"><span>✳</span><div>🌿</div></div>
             </div>
-          </div>
-
-          <section className="auth-card">
-            <div className="auth-card-heading">
-              <span className="section-kicker">{t.brand}</span>
-              <h2>{mode === "login" ? t.login : t.signup}</h2>
-              <p>{mode === "login" ? t.loginSub : t.signupSub}</p>
+            <div className="section-heading"><div><h2>Farm tools</h2><p>Choose a service to continue.</p></div></div>
+            <div className="tool-grid">
+              <button className="tool-card" onClick={() => setPage("diagnosis")}><span className="tool-icon green">⌕</span><h3>{t.diagnosis}</h3><p>Capture or upload a crop image.</p><span className="card-link">Open module →</span></button>
+              <button className="tool-card" onClick={() => setPage("market")}><span className="tool-icon gold">↗</span><h3>{t.market}</h3><p>Review price history when data is connected.</p><span className="card-link">Open module →</span></button>
+              <button className="tool-card" onClick={() => setPage("profile")}><span className="tool-icon sage">○</span><h3>{t.profile}</h3><p>Maintain your crop and land details.</p><span className="card-link">Open module →</span></button>
             </div>
-
-            <form onSubmit={handleAuth} className="form-stack">
-              {mode === "signup" && (
-                <>
-                  <label className="field">
-                    <span>{t.name}</span>
-                    <input
-                      name="full_name"
-                      autoComplete="name"
-                      value={form.full_name}
-                      onChange={updateForm}
-                      required
-                      maxLength={100}
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>{t.phone}</span>
-                    <input
-                      name="phone"
-                      type="tel"
-                      autoComplete="tel"
-                      value={form.phone}
-                      onChange={updateForm}
-                      maxLength={20}
-                    />
-                  </label>
-                </>
-              )}
-
-              <label className="field">
-                <span>{t.email}</span>
-                <input
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={updateForm}
-                  required
-                />
-              </label>
-
-              <label className="field">
-                <span>{t.password}</span>
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete={
-                    mode === "login" ? "current-password" : "new-password"
-                  }
-                  value={form.password}
-                  onChange={updateForm}
-                  minLength={6}
-                  required
-                />
-                {mode === "signup" && (
-                  <small>Use at least 6 characters.</small>
-                )}
-              </label>
-
-              {message && (
-                <p
-                  className={`notice ${isError ? "notice-error" : "notice-success"}`}
-                  role="status"
-                >
-                  {message}
-                </p>
-              )}
-
-              <button
-                className="button button-primary button-wide"
-                type="submit"
-                disabled={submitting}
-              >
-                {submitting
-                  ? t.loading
-                  : mode === "login"
-                    ? t.signIn
-                    : t.signUp}
-              </button>
-            </form>
-
-            <p className="auth-switch">
-              {mode === "login" ? t.noAccount : t.haveAccount}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(mode === "login" ? "signup" : "login");
-                  setMessage("");
-                  setIsError(false);
-                }}
-              >
-                {mode === "login" ? t.create : t.switchLogin}
-              </button>
-            </p>
+            <div className="support-strip"><span>✳</span><div><strong>{t.schemes}</strong><p>{t.schemesText}</p></div></div>
           </section>
-        </section>
-      ) : (
-        <section className="dashboard" id="home">
-          <div className="dashboard-heading">
-            <div>
-              <span className="eyebrow">AGRISENSE · FARMER SPACE</span>
-              <h1>{t.dashboard}</h1>
-              <p>
-                {t.welcome},{" "}
-                {profile.full_name || user.user_metadata?.full_name || user.email}
-              </p>
-            </div>
-            <span className="signed-in-label">● Signed in</span>
-          </div>
+        )}
 
-          <div className="feature-grid">
-            <article className="feature-card">
-              <span className="feature-number">01</span>
-              <h3>{t.diagnosis}</h3>
-              <p>{t.diagnosisSub}</p>
-              <span className="feature-status">AI integration pending</span>
-            </article>
-            <article className="feature-card">
-              <span className="feature-number">02</span>
-              <h3>{t.prices}</h3>
-              <p>{t.pricesSub}</p>
-              <span className="feature-status">Market data integration pending</span>
-            </article>
-            <article className="feature-card">
-              <span className="feature-number">03</span>
-              <h3>{t.schemes}</h3>
-              <p>{t.schemesSub}</p>
-              <span className="feature-status">Matching module pending</span>
-            </article>
-            <article className="feature-card">
-              <span className="feature-number">04</span>
-              <h3>{t.recovery}</h3>
-              <p>{t.recoverySub}</p>
-              <span className="feature-status">Tracking module pending</span>
-            </article>
-          </div>
-
-          <section className="profile-card">
-            <div className="profile-heading">
-              <div>
-                <span className="section-kicker">YOUR INFORMATION</span>
-                <h2>{t.profile}</h2>
-                <p>{t.profileSub}</p>
-              </div>
-            </div>
-
-            <form onSubmit={saveProfile} className="profile-form">
-              <label className="field">
-                <span>{t.name}</span>
-                <input
-                  name="full_name"
-                  value={profile.full_name}
-                  onChange={updateProfile}
-                  required
-                  maxLength={100}
-                />
-              </label>
-
-              <label className="field">
-                <span>{t.phone}</span>
-                <input
-                  name="phone"
-                  type="tel"
-                  value={profile.phone ?? ""}
-                  onChange={updateProfile}
-                  maxLength={20}
-                />
-              </label>
-
-              <label className="field">
-                <span>{t.district}</span>
-                <input
-                  name="district"
-                  value={profile.district ?? ""}
-                  onChange={updateProfile}
-                  placeholder="e.g. Coimbatore"
-                />
-              </label>
-
-              <label className="field">
-                <span>{t.village}</span>
-                <input
-                  name="village"
-                  value={profile.village ?? ""}
-                  onChange={updateProfile}
-                />
-              </label>
-
-              <fieldset className="crop-fieldset">
-                <legend>{t.crops}</legend>
-                <div className="crop-checkboxes">
-                  <label className="crop-check">
-                    <input
-                      type="checkbox"
-                      checked={profile.crops.includes("Banana")}
-                      onChange={() => toggleCrop("Banana")}
-                    />
-                    {t.banana}
-                  </label>
-                  <label className="crop-check">
-                    <input
-                      type="checkbox"
-                      checked={profile.crops.includes("Coconut")}
-                      onChange={() => toggleCrop("Coconut")}
-                    />
-                    {t.coconut}
-                  </label>
+        {page === "diagnosis" && (
+          <section className="page-content">
+            <div className="section-heading"><div><span className="eyebrow">CROP HEALTH</span><h1>{t.diagnosis}</h1><p>{t.cameraHint}</p></div></div>
+            <div className="diagnosis-layout">
+              <section className="content-card">
+                <label className="field-label">{t.chooseCrop}</label>
+                <div className="crop-select-grid">
+                  {crops.map((item) => <button key={item} className={`crop-choice ${crop === item ? "selected" : ""}`} onClick={() => setCrop(item)}><span>{item === "Banana" ? "🍃" : "🌴"}</span><strong>{language === "ta" ? item === "Banana" ? "வாழை" : "தென்னை" : item}</strong><span className="radio-dot">{crop === item ? "✓" : ""}</span></button>)}
                 </div>
-              </fieldset>
+                <div className="upload-box">
+                  {photo ? <img className="photo-preview" src={photo.url} alt="Selected crop" /> : <div className="upload-placeholder"><span>＋</span><strong>{t.selectPhoto}</strong><p>JPG, PNG or WEBP · up to 10 MB</p></div>}
+                  <div className="upload-actions">
+                    <button className="primary-button" onClick={() => cameraRef.current?.click()}>▣ {t.takePhoto}</button>
+                    <button className="secondary-button" onClick={() => galleryRef.current?.click()}>▧ {t.gallery}</button>
+                  </div>
+                  <input ref={cameraRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} />
+                  <input ref={galleryRef} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} />
+                </div>
+                <button className="primary-button full-width" disabled={!photo} onClick={() => { setMessage(t.noModelText); setIsError(false); }}>{t.analyze}</button>
+              </section>
+              <section className="content-card result-card">
+                <span className="result-symbol">✳</span><span className="eyebrow">ANALYSIS RESULT</span><h2>{t.noModel}</h2><p>{t.noModelText}</p>
+                <div className="result-divider" /><h3>{t.recommendation}</h3><p>{t.recommendationText}</p>
+                {message && <p className={isError ? "alert error" : "alert"}>{message}</p>}
+              </section>
+            </div>
+          </section>
+        )}
 
-              <label className="field">
-                <span>{t.land}</span>
-                <input
-                  name="land_size_acres"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={profile.land_size_acres}
-                  onChange={updateProfile}
-                />
-              </label>
+        {page === "market" && (
+          <section className="page-content">
+            <div className="section-heading"><div><span className="eyebrow">MARKET INTELLIGENCE</span><h1>{t.market}</h1><p>Understand price movement before making selling decisions.</p></div></div>
+            <div className="market-filter">
+              <label>{t.chooseCrop}<select value={crop} onChange={(event) => setCrop(event.target.value)}><option value="Banana">Banana / வாழை</option><option value="Coconut">Coconut / தென்னை</option></select></label>
+              <label>Market data source<select value="pending" disabled><option value="pending">Not connected</option></select></label>
+            </div>
+            <div className="market-empty">
+              <span className="chart-icon">↗</span><h2>Market data connection required</h2><p>{t.marketText}</p><div className="empty-chart"><span>Price</span><div className="chart-grid-lines" /><span>Date →</span></div><small>No price values or trend are displayed until verified data is available.</small>
+            </div>
+          </section>
+        )}
 
-              <label className="field">
-                <span>{t.category}</span>
-                <select
-                  name="farmer_category"
-                  value={profile.farmer_category ?? ""}
-                  onChange={updateProfile}
-                >
-                  <option value="">Select</option>
-                  <option value="marginal">{t.marginal}</option>
-                  <option value="small">{t.small}</option>
-                  <option value="other">{t.other}</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>{t.ownership}</span>
-                <select
-                  name="land_ownership"
-                  value={profile.land_ownership ?? ""}
-                  onChange={updateProfile}
-                >
-                  <option value="">Select</option>
-                  <option value="owned">{t.owned}</option>
-                  <option value="leased">{t.leased}</option>
-                  <option value="shared">{t.shared}</option>
-                </select>
-              </label>
-
-              {message && (
-                <p
-                  className={`notice ${isError ? "notice-error" : "notice-success"}`}
-                  role="status"
-                >
-                  {message}
-                </p>
-              )}
-
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={submitting}
-              >
-                {submitting ? t.loading : t.save}
-              </button>
+        {page === "profile" && (
+          <section className="page-content">
+            <div className="section-heading"><div><span className="eyebrow">YOUR FARM</span><h1>{t.profile}</h1><p>{t.profileText}</p></div></div>
+            <form className="content-card profile-form" onSubmit={saveProfile}>
+              <label>{t.name}<input name="full_name" value={profile.full_name ?? ""} onChange={setProfileField} required /></label>
+              <label>{t.phone}<input name="phone" type="tel" value={profile.phone ?? ""} onChange={setProfileField} /></label>
+              <label>{t.district}<input name="district" value={profile.district ?? ""} onChange={setProfileField} /></label>
+              <label>{t.village}<input name="village" value={profile.village ?? ""} onChange={setProfileField} /></label>
+              <label>{t.land}<input name="land_size_acres" type="number" min="0" step="0.01" value={profile.land_size_acres ?? ""} onChange={setProfileField} /></label>
+              <label>{t.ownership}<select name="land_ownership" value={profile.land_ownership ?? ""} onChange={setProfileField}><option value="">Select</option><option value="owned">{t.owned}</option><option value="leased">{t.leased}</option><option value="other">{t.other}</option></select></label>
+              <fieldset><legend>{t.chooseCrop}</legend>{crops.map((item) => <label className="check-label" key={item}><input type="checkbox" checked={(profile.crops ?? []).includes(item)} onChange={() => setProfile({ ...profile, crops: (profile.crops ?? []).includes(item) ? profile.crops.filter((value) => value !== item) : [...(profile.crops ?? []), item] })} />{language === "ta" ? item === "Banana" ? "வாழை" : "தென்னை" : item}</label>)}</fieldset>
+              {message && <p className={isError ? "alert error" : "alert"}>{message}</p>}
+              <button className="primary-button" disabled={busy}>{busy ? t.loading : t.save}</button>
             </form>
           </section>
-        </section>
-      )}
+        )}
 
-      <footer className="app-footer">
-        AGRISENSE · Supporting informed farming decisions
-      </footer>
-    </main>
+        <footer className="app-footer">AGRISENSE · Crop health and farmer welfare</footer>
+      </main>
+
+      <nav className="mobile-nav">
+        {navItems.map((item) => <button key={item.id} className={page === item.id ? "active" : ""} onClick={() => { setPage(item.id); setMessage(""); }}><span>{item.icon}</span><small>{item.label}</small></button>)}
+      </nav>
+    </div>
   );
 }
 

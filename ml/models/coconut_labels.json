@@ -1,0 +1,14 @@
+{
+  "crop": "coconut",
+  "class_names": [
+    "Bud Root Dropping",
+    "Bud Rot",
+    "Gray Leaf Spot",
+    "Leaf Rot",
+    "Stem Bleeding"
+  ],
+  "image_size": [
+    224,
+    224
+  ]
+}

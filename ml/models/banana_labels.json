@@ -1,0 +1,12 @@
+{
+  "crop": "banana",
+  "class_names": [
+    "Black Sigatoka",
+    "Fusarium Wilt",
+    "Healthy"
+  ],
+  "image_size": [
+    224,
+    224
+  ]
+}

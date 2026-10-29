@@ -26,3 +26,30 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Python environment and cache
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# ML training outputs and local secrets
+ml/.env
+ml/.env.*
+!ml/.env.example
+
+# Dataset archives and generated datasets
+ml/prepared/
+ml/datasets/
+*.zip
+*.h5
+
+# Ignore all downloaded and extracted dataset archives
+ml/datasets/
+*.zip
+
+# Ignore Python virtual environments and caches
+ml/.venv/
+**/__pycache__/
+*.py[cod]

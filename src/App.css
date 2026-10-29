@@ -102,3 +102,65 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:1050px){.sidebar{width:210px}.main-panel{margin-left:210px}.tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.auth-screen{padding:6%;gap:5%}.auth-panel{padding:25px}}
 @media(max-width:760px){.auth-screen{grid-template-columns:1fr;gap:28px;padding:30px 5%}.auth-story>.eyebrow{margin-top:35px}.auth-story h1{font-size:39px;letter-spacing:-1px}.story-tags{gap:9px;margin-top:22px}.auth-panel{padding:23px}.sidebar{display:none}.main-panel{margin-left:0;padding-bottom:76px}.page-topbar{height:66px;padding:0 5%}.page-content{width:90%;padding-top:24px}.welcome-banner{padding:27px 23px;min-height:230px}.welcome-banner>div:first-child{position:relative;z-index:1;max-width:85%}.banner-illustration{right:-40px;width:130px;height:130px;opacity:.55}.banner-illustration div{font-size:65px}.tool-grid{grid-template-columns:1fr}.tool-card{padding:18px}.tool-card p{min-height:0}.diagnosis-layout{grid-template-columns:1fr}.market-filter{grid-template-columns:1fr}.profile-form{grid-template-columns:1fr}.mobile-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-template-columns:repeat(4,1fr);padding:7px 4px calc(7px + env(safe-area-inset-bottom));background:#fffefa;border-top:1px solid var(--border)}.mobile-nav button{display:grid;justify-items:center;gap:4px;border:0;border-radius:9px;padding:6px 2px;background:transparent;color:#778275}.mobile-nav button.active{background:#e9efe4;color:var(--green)}.mobile-nav button span{font-size:20px}.mobile-nav small{font-size:9px}.app-footer{padding:15px 10px}.result-card{padding:20px}}
 @media(max-width:380px){.crop-select-grid{grid-template-columns:1fr}.upload-actions{grid-template-columns:1fr}.welcome-banner>div:first-child{max-width:100%}.banner-illustration{opacity:.2}.section-heading h1{font-size:22px}}
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 3.25rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.4rem;
+}
+
+.password-toggle:focus-visible,
+.forgot-link:focus-visible {
+  outline: 2px solid #28583a;
+  outline-offset: 3px;
+}
+
+.forgot-link {
+  display: block;
+  margin: 0.5rem 0;
+  text-align: right;
+}
+
+.camera-preview {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.camera-preview video {
+  display: block;
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #111;
+}
+
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.upload-actions button {
+  flex: 1;
+  min-width: 130px;
+}

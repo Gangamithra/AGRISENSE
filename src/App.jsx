@@ -116,6 +116,23 @@ const labels = {
   },
 };
 
+const tamilDiseaseNames = {
+  "Black Sigatoka": "Black Sigatoka (வாழை இலைகளில் கரும்புள்ளிகளை ஏற்படுத்தும் நோய்)",
+  "Fusarium Wilt": "Fusarium Wilt (வாழை வாடல் நோய்)",
+  "Healthy": "ஆரோக்கியமான பயிர்",
+  "Bud Root Dropping": "Bud Root Dropping (தென்னையின் மொட்டு மற்றும் வேர் பாதிப்பு)",
+  "Bud Rot": "Bud Rot (தென்னையின் மொட்டு அழுகல் நோய்)",
+  "Gray Leaf Spot": "Gray Leaf Spot (சாம்பல் இலைப்புள்ளி நோய்)",
+  "Leaf Rot": "Leaf Rot (இலை அழுகல் நோய்)",
+  "Stem Bleeding": "Stem Bleeding (தண்டிலிருந்து திரவம் கசியும் நோய்)",
+};
+
+const tamilCropNames = {
+  Banana: "வாழை",
+  Coconut: "தென்னை",
+};
+
+
 const emptyProfile = {
   full_name: "",
   phone: "",
@@ -134,15 +151,21 @@ function App() {
   const [mode, setMode] = useState("login");
   const [page, setPage] = useState("dashboard");
   const [form, setForm] = useState({ full_name: "", email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [profile, setProfile] = useState(emptyProfile);
   const [crop, setCrop] = useState("Banana");
   const [photo, setPhoto] = useState(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [isError, setIsError] = useState(false);
-  const cameraRef = useRef(null);
+  const [diagnosisResult, setDiagnosisResult] = useState(null);
+const [diagnosing, setDiagnosing] = useState(false);
   const galleryRef = useRef(null);
   const t = labels[language];
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -153,7 +176,16 @@ function App() {
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => setUser(session?.user ?? null)
+      (event, session) => {
+        setUser(session?.user ?? null);
+        if (event === "PASSWORD_RECOVERY") {
+          setMode("reset");
+          setForm((current) => ({ ...current, password: "" }));
+          setShowPassword(false);
+          setMessage("");
+          setIsError(false);
+        }
+      }
     );
     return () => {
       active = false;
@@ -195,12 +227,91 @@ function App() {
     };
   }, [photo]);
 
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
   function setField(event) {
     setForm({ ...form, [event.target.name]: event.target.value });
   }
 
   function setProfileField(event) {
     setProfile({ ...profile, [event.target.name]: event.target.value });
+  }
+  async function openLiveCamera() {
+    setCameraError("");
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(
+        "Live camera is unavailable here. Open AGRISENSE using HTTPS or localhost."
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" }
+        },
+        audio: false
+      });
+
+      streamRef.current = stream;
+      setCameraOpen(true);
+
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {
+            setCameraError("Unable to start the camera preview.");
+          });
+        }
+      });
+    } catch (error) {
+      setCameraError(
+        error.name === "NotAllowedError"
+          ? "Camera permission was denied. Allow camera access in your browser settings."
+          : "Unable to open the camera. Check that it is connected and not being used by another app."
+      );
+    }
+  }
+
+  function closeLiveCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  }
+
+  function captureLivePhoto() {
+    const video = videoRef.current;
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError("Wait for the camera preview to load, then try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext("2d");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError("Could not capture the photo. Please try again.");
+        return;
+      }
+
+      const file = new File([blob], "agrisense-crop.jpg", {
+        type: "image/jpeg"
+      });
+
+      choosePhoto({ target: { files: [file], value: "" } });
+      closeLiveCamera();
+    }, "image/jpeg", 0.92);
   }
 
   function choosePhoto(event) {
@@ -221,23 +332,146 @@ function App() {
     setMessage("");
     setIsError(false);
   }
+  async function analyzeCrop() {
+    if (!photo?.file) {
+      setMessage("Please select a crop photo first.");
+      setIsError(true);
+      return;
+    }
+
+    setDiagnosing(true);
+    setDiagnosisResult(null);
+    setMessage("");
+    setIsError(false);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", photo.file);
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/predict/${crop.toLowerCase()}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Prediction failed.");
+      }
+
+      if (language === "ta") {
+        try{
+          const translationResponse = await fetch(
+          "http://127.0.0.1:8000/translate",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              texts: [
+                `Prediction: ${data.predicted_class}.`,
+                `Confidence: ${Number(data.confidence).toFixed(2)}.`,
+              ],
+              target_language: "Tamil",
+            }),
+            signal: AbortSignal.timeout(15000),
+          }
+        );
+          const translationData = await translationResponse.json();
+
+          if (translationResponse.ok) {
+            data.translatedTexts = translationData.translations;
+            data.translationFallback = translationData.fallback === true;
+          } else {
+            data.translationFallback = true;
+          }
+        } catch {
+          data.translationFallback = true;
+        }
+      }
+
+      setDiagnosisResult(data);
+    } catch (error) {
+      setMessage(
+        error.message ||
+          "Unable to connect to the AI model. Check that the Python API is running."
+      );
+      setIsError(true);
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
+
+  async function sendPasswordReset() {
+    const email = form.email.trim();
+
+    if (!email) {
+      setMessage("Enter your email address first.");
+      setIsError(true);
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+    setIsError(false);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setMessage("If an account exists for this email, a password reset link will be sent.");
+    } catch (error) {
+      setMessage(error.message || "Unable to request a password reset.");
+      setIsError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function authenticate(event) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
     setIsError(false);
+
     try {
+      if (mode === "reset") {
+        const { error } = await supabase.auth.updateUser({
+          password: form.password,
+        });
+        if (error) throw error;
+
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw signOutError;
+
+        setMode("login");
+        setForm((current) => ({ ...current, password: "" }));
+        setShowPassword(false);
+        setMessage("Password updated successfully. Please sign in.");
+        return;
+      }
+
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: form.email.trim(),
           password: form.password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { full_name: form.full_name.trim(), preferred_language: language },
+            data: {
+              full_name: form.full_name.trim(),
+              preferred_language: language,
+            },
           },
         });
         if (error) throw error;
+
+        setForm((current) => ({ ...current, password: "" }));
+        setShowPassword(false);
+
         if (data.session) {
           setUser(data.user);
         } else {
@@ -250,6 +484,9 @@ function App() {
           password: form.password,
         });
         if (error) throw error;
+
+        setForm((current) => ({ ...current, password: "" }));
+        setShowPassword(false);
       }
     } catch (error) {
       setMessage(error.message || t.error);
@@ -297,7 +534,7 @@ function App() {
 
   if (loading) return <div className="loading-screen">{t.loading}</div>;
 
-  if (!user) {
+  if (!user || mode === "reset") {
     return (
       <main className="auth-screen">
         <section className="auth-story">
@@ -311,16 +548,103 @@ function App() {
           <div className="language-switch">
             <button onClick={() => setLanguage(language === "en" ? "ta" : "en")}>{t.language}</button>
           </div>
-          <h2>{mode === "login" ? t.login : t.signup}</h2>
-          <p className="muted">{t.signInText}</p>
+          <h2>
+            {mode === "login" ? t.login : mode === "signup" ? t.signup : "Reset password"}
+          </h2>
+          <p className="muted">
+            {mode === "reset" ? "Enter a new password for your account." : t.signInText}
+          </p>
           <form onSubmit={authenticate} className="form-stack">
-            {mode === "signup" && <label>{t.name}<input name="full_name" value={form.full_name} onChange={setField} required maxLength={100} /></label>}
-            <label>{t.email}<input name="email" type="email" value={form.email} onChange={setField} required autoComplete="email" /></label>
-            <label>{t.password}<input name="password" type="password" value={form.password} onChange={setField} required minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+            {mode === "signup" && (
+              <label>
+                {t.name}
+                <input
+                  name="full_name"
+                  value={form.full_name}
+                  onChange={setField}
+                  required
+                  maxLength={100}
+                  autoComplete="name"
+                />
+              </label>
+            )}
+
+            {mode !== "reset" && (
+              <label>
+                {t.email}
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={setField}
+                  required
+                  autoComplete="email"
+                />
+              </label>
+            )}
+
+            <label className="password-label">
+              {mode === "reset" ? "New password" : t.password}
+              <span className="password-field">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={setField}
+                  required
+                  minLength={6}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁"}
+                </button>
+              </span>
+            </label>
+
             {message && <p className={isError ? "alert error" : "alert"}>{message}</p>}
-            <button className="primary-button full-width" disabled={busy}>{busy ? t.loading : mode === "login" ? t.login : t.signup}</button>
+            <button className="primary-button full-width" disabled={busy}>
+              {busy
+                ? t.loading
+                : mode === "reset"
+                  ? "Update password"
+                  : mode === "login"
+                    ? t.login
+                    : t.signup}
+            </button>
           </form>
-          <button className="text-button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(""); }}>{mode === "login" ? t.switchSignup : t.switchLogin}</button>
+
+          {mode === "login" && (
+            <button
+              type="button"
+              className="text-button forgot-link"
+              onClick={sendPasswordReset}
+              disabled={busy}
+            >
+              Forgot password?
+            </button>
+          )}
+
+          {mode !== "reset" && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setMode(mode === "login" ? "signup" : "login");
+                setForm((current) => ({ ...current, password: "" }));
+                setShowPassword(false);
+                setMessage("");
+                setIsError(false);
+              }}
+            >
+              {mode === "login" ? t.switchSignup : t.switchLogin}
+            </button>
+          )}
         </section>
       </main>
     );
@@ -386,19 +710,163 @@ function App() {
                 <div className="upload-box">
                   {photo ? <img className="photo-preview" src={photo.url} alt="Selected crop" /> : <div className="upload-placeholder"><span>＋</span><strong>{t.selectPhoto}</strong><p>JPG, PNG or WEBP · up to 10 MB</p></div>}
                   <div className="upload-actions">
-                    <button className="primary-button" onClick={() => cameraRef.current?.click()}>▣ {t.takePhoto}</button>
-                    <button className="secondary-button" onClick={() => galleryRef.current?.click()}>▧ {t.gallery}</button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={openLiveCamera}
+                    >
+                      ▣ Open Camera
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => galleryRef.current?.click()}
+                    >
+                      ▧ {t.gallery}
+                    </button>
                   </div>
-                  <input ref={cameraRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} />
-                  <input ref={galleryRef} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} />
+                  <input
+                    ref={galleryRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={choosePhoto}
+                  />
+                  {cameraError && <p className="alert error">{cameraError}</p>}
+                  {cameraOpen && (
+                    <div className="camera-preview">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{
+                          width: "100%",
+                          maxHeight: "400px",
+                          objectFit: "cover",
+                          borderRadius: "16px",
+                          background: "#111",
+                        }}
+                      />
+                      <div className="upload-actions">
+                        <button
+                          type="button"
+                          className="primary-button"
+                          onClick={captureLivePhoto}
+                        >
+                          Capture Photo
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={closeLiveCamera}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button className="primary-button full-width" disabled={!photo} onClick={() => { setMessage(t.noModelText); setIsError(false); }}>{t.analyze}</button>
+                <button
+  className="primary-button full-width"
+  disabled={!photo || diagnosing}
+  onClick={analyzeCrop}
+>
+  {diagnosing ? "Analyzing..." : t.analyze}
+</button>
               </section>
-              <section className="content-card result-card">
-                <span className="result-symbol">✳</span><span className="eyebrow">ANALYSIS RESULT</span><h2>{t.noModel}</h2><p>{t.noModelText}</p>
-                <div className="result-divider" /><h3>{t.recommendation}</h3><p>{t.recommendationText}</p>
-                {message && <p className={isError ? "alert error" : "alert"}>{message}</p>}
-              </section>
+
+<section className="content-card result-card">
+  <span className="result-symbol">✳</span>
+
+<span className="eyebrow">ANALYSIS RESULT</span>
+
+{diagnosisResult ? (
+  <>
+    <h2>
+  {language === "ta"
+    ? tamilDiseaseNames[diagnosisResult.predicted_class] ||
+      diagnosisResult.predicted_class
+    : diagnosisResult.predicted_class}
+</h2>
+<p>
+  {language === "ta" ? "பயிர்" : "Crop"}:{" "}
+  {language === "ta"
+    ? tamilCropNames[diagnosisResult.crop] || diagnosisResult.crop
+    : diagnosisResult.crop}
+</p>
+<p>
+  {language === "ta" ? "மாதிரியின் நம்பகத்தன்மை" : "Model confidence"}:{" "}
+  {(diagnosisResult.confidence * 100).toFixed(2)}%
+</p>
+
+    {language === "ta" && diagnosisResult.translationFallback && (
+      <p className="alert">
+        தமிழ் மொழிபெயர்ப்பு தற்காலிகமாக கிடைக்கவில்லை. கீழே உள்ள நோய் பெயர் ஆங்கிலத்தில் காட்டப்படலாம்.
+      </p>
+    )}
+
+    <div className="result-divider" />
+
+    <h3>{language === "ta" ? "கணிப்பு நிகழ்தகவுகள்" : "Prediction probabilities"}</h3>
+
+    {Object.entries(diagnosisResult.probabilities || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, probability]) => (
+        <div key={name} className="probability-row">
+          <div className="probability-label">
+          <span>
+  {language === "ta" ? tamilDiseaseNames[name] || name : name}
+</span>
+            <strong>{(probability * 100).toFixed(1)}%</strong>
+          </div>
+          <div className="probability-track">
+            <div
+              className="probability-fill"
+              style={{
+                width: `${Math.min(100, Math.max(0, probability * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
+      ))}
+
+    <p className="alert">
+      {language === "ta"
+        ? "இது AI கணிப்பு மட்டுமே; உறுதிப்படுத்தப்பட்ட கள நோய் கண்டறிதல் அல்ல. சிகிச்சை அளிப்பதற்கு முன் வேளாண் அலுவலரிடம் ஆலோசனை பெறவும்."
+        : "This is an AI prediction, not a confirmed field diagnosis. Seek advice from an agricultural officer before applying treatments."}
+    </p>
+  </>
+) : (
+  <>
+    <h2>
+      {diagnosing
+        ? language === "ta" ? "படம் ஆய்வு செய்யப்படுகிறது..." : "Analyzing crop image..."
+        : language === "ta" ? "உங்கள் நோய் கண்டறிதல் இங்கே தோன்றும்" : "Your diagnosis will appear here"}
+    </h2>
+    <p>
+      {diagnosing
+        ? language === "ta" ? "பயிற்றுவிக்கப்பட்ட மாதிரி படத்தை ஆய்வு செய்கிறது." : "The trained model is examining your image."
+        : language === "ta"
+          ? "வாழை அல்லது தென்னையைத் தேர்ந்தெடுத்து, படத்தைப் பதிவேற்றி, பகுப்பாய்வு செய்யவும்."
+          : "Choose Banana or Coconut, upload a photo, and select Analyze image."}
+    </p>
+  </>
+)}
+
+<div className="result-divider" />
+
+<h3>{t.recommendation}</h3>
+<p>{t.recommendationText}</p>
+
+
+  {message && (
+    <p className={isError ? "alert error" : "alert"}>
+      {message}
+    </p>
+  )}
+</section>
+
             </div>
           </section>
         )}

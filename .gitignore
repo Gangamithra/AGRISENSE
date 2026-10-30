@@ -53,3 +53,4 @@ ml/datasets/
 ml/.venv/
 **/__pycache__/
 *.py[cod]
+supabase/.env

@@ -108,12 +108,10 @@ button:disabled{opacity:.55;cursor:not-allowed}
   align-items: center;
   width: 100%;
 }
-
 .password-field input {
   width: 100%;
   padding-right: 3.25rem;
 }
-
 .password-toggle {
   position: absolute;
   right: 0.75rem;
@@ -126,25 +124,21 @@ button:disabled{opacity:.55;cursor:not-allowed}
   font-size: 1.1rem;
   padding: 0.4rem;
 }
-
 .password-toggle:focus-visible,
 .forgot-link:focus-visible {
   outline: 2px solid #28583a;
   outline-offset: 3px;
 }
-
 .forgot-link {
   display: block;
   margin: 0.5rem 0;
   text-align: right;
 }
-
 .camera-preview {
   display: grid;
   gap: 1rem;
   margin-top: 1rem;
 }
-
 .camera-preview video {
   display: block;
   width: 100%;
@@ -153,14 +147,747 @@ button:disabled{opacity:.55;cursor:not-allowed}
   border-radius: 16px;
   background: #111;
 }
-
 .upload-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-
 .upload-actions button {
   flex: 1;
   min-width: 130px;
+}
+
+/* =========================================
+   AGRISENSE - TREATMENT RECOMMENDATIONS
+   Added without changing existing page styles
+========================================= */
+
+.treatment-guidance {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.treatment-guidance > h3 {
+  margin: 0 0 7px;
+  color: var(--dark);
+  font: 800 16px Manrope, sans-serif;
+}
+
+.treatment-guidance > p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.treatment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 13px;
+  width: 100%;
+}
+
+.treatment-card {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e2e9dc;
+  border-radius: 12px;
+  background: #f8faf5;
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.treatment-card:hover {
+  border-color: #b6c9ac;
+  box-shadow: 0 4px 12px rgba(40, 88, 58, 0.07);
+}
+
+.treatment-type {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #e7eee1;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.treatment-card h4 {
+  margin: 9px 0 5px;
+  color: var(--dark);
+  font: 800 13px/1.45 Manrope, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.treatment-concentration {
+  display: inline-block;
+  margin: 2px 0 7px;
+  color: var(--green);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.treatment-source {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px !important;
+  line-height: 1.5 !important;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #e2e9dc;
+}
+
+.treatment-details summary {
+  color: var(--green);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.treatment-details p {
+  margin: 8px 0;
+  color: #526157;
+  font-size: 11px !important;
+  line-height: 1.65 !important;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details a {
+  display: inline-block;
+  margin: 5px 0;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.treatment-loading,
+.treatment-error,
+.treatment-empty,
+.treatment-fallback {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.treatment-loading {
+  background: #eaf3e6;
+  color: var(--green);
+}
+
+.treatment-error {
+  background: #fff0ed;
+  color: #943e2e;
+}
+
+.treatment-empty {
+  background: #f0f1eb;
+  color: var(--muted);
+}
+
+.treatment-fallback {
+  background: #f7efd9;
+  color: #80632c;
+}
+
+.treatment-safety-note {
+  margin-top: 13px;
+  padding: 11px 13px;
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  background: #f9f4e7;
+  color: #735d32;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* Keep two cards side by side on tablets and most phones */
+@media(max-width:760px) {
+  .treatment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .treatment-card {
+    padding: 10px;
+  }
+
+  .treatment-card h4 {
+    font-size: 12px;
+  }
+
+  .treatment-concentration {
+    font-size: 14px;
+  }
+}
+
+/* Very narrow phones */
+@media(max-width:360px) {
+  .treatment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Treatment section heading */
+
+.treatment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.treatment-heading h3 {
+  margin: 6px 0;
+  color: var(--dark);
+  font: 800 17px Manrope, sans-serif;
+}
+
+.treatment-heading p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.treatment-heading-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #e7eee1;
+  font-size: 22px;
+}
+
+.treatment-guidance .alert {
+  margin: 10px 0;
+}
+
+.treatment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.treatment-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e2e9dc;
+  border-radius: 13px;
+  background: #f8faf5;
+  text-align: left;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.treatment-card:hover {
+  border-color: #b6c9ac;
+  box-shadow: 0 4px 12px rgba(40, 88, 58, .07);
+}
+
+.treatment-type {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #e7eee1;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.treatment-card h4 {
+  margin: 10px 0 5px;
+  color: var(--dark);
+  font: 800 13px/1.5 Manrope, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.treatment-concentration {
+  display: block;
+  margin: 5px 0;
+  color: var(--green);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.treatment-source {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px !important;
+  line-height: 1.5 !important;
+}
+
+.treatment-details {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e9dc;
+}
+
+.treatment-details summary {
+  color: var(--green);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.treatment-details p {
+  margin: 9px 0;
+  color: #526157;
+  font-size: 11px !important;
+  line-height: 1.7 !important;
+}
+
+.treatment-details a {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.treatment-safety-note {
+  margin-top: 14px;
+  padding: 12px;
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  background: #f9f4e7;
+  color: #735d32;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.treatment-loading,
+.treatment-error,
+.treatment-empty {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.treatment-loading {
+  background: #eaf3e6;
+  color: var(--green);
+}
+
+.treatment-error {
+  background: #fff0ed;
+  color: #943e2e;
+}
+
+.treatment-empty {
+  background: #f0f1eb;
+  color: var(--muted);
+}
+
+@media (max-width: 380px) {
+  .treatment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* =====================================
+   AGRISENSE - IMPROVED DIAGNOSIS LAYOUT
+===================================== */
+
+.diagnosis-page {
+  display: grid;
+  gap: 22px;
+  width: 100%;
+}
+
+.diagnosis-page .diagnosis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 20px;
+}
+
+.diagnosis-upload-card,
+.diagnosis-result-card {
+  min-width: 0;
+  width: 100%;
+}
+
+.diagnosis-upload-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.diagnosis-upload-card .upload-box {
+  flex: 1;
+}
+
+.diagnosis-upload-card .analyze-button {
+  margin-top: 16px;
+  min-height: 48px;
+}
+
+.diagnosis-result-card {
+  align-self: stretch;
+  text-align: left;
+}
+
+.diagnosis-result-card .result-symbol {
+  margin-bottom: 14px;
+}
+
+.diagnosis-result-card h2 {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.diagnosis-result-card .alert {
+  margin-top: 16px;
+}
+
+/* Treatment section */
+
+.treatment-panel {
+  width: 100%;
+  min-width: 0;
+  padding: 26px;
+  text-align: left;
+}
+
+.treatment-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.treatment-panel-heading h2 {
+  margin: 7px 0;
+  font: 800 23px Manrope, sans-serif;
+  color: var(--dark);
+}
+
+.treatment-panel-heading p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.treatment-disease-label {
+  padding: 9px 14px;
+  border-radius: 20px;
+  background: #eaf0e5;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.treatment-guidance {
+  width: 100%;
+}
+
+.treatment-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+  width: 100%;
+}
+
+.treatment-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 19px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #fffefa;
+  text-align: left;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.treatment-card:hover {
+  border-color: #b6c7b2;
+  transform: translateY(-2px);
+}
+
+.treatment-type {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: #eaf0e5;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.treatment-card h4 {
+  margin: 13px 0 7px;
+  color: var(--dark);
+  font: 700 16px/1.4 Manrope, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.treatment-concentration {
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.treatment-source {
+  margin-top: 10px !important;
+  color: var(--muted);
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details {
+  width: 100%;
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.treatment-details summary {
+  color: var(--green);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.treatment-details p {
+  margin-top: 12px;
+  color: #667366;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.treatment-details a {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.treatment-details small {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.treatment-safety-note {
+  margin-top: 20px;
+}
+
+.treatment-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #f4f6ef;
+  color: var(--muted);
+}
+
+.treatment-empty > span {
+  font-size: 24px;
+  color: var(--green);
+}
+
+.treatment-empty p,
+.treatment-status {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* Tablet */
+
+@media (max-width: 1050px) {
+  .treatment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 760px) {
+  .diagnosis-page {
+    gap: 16px;
+  }
+
+  .diagnosis-page .diagnosis-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .treatment-panel {
+    padding: 20px;
+  }
+
+  .treatment-panel-heading h2 {
+    font-size: 20px;
+  }
+
+  .treatment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .treatment-card {
+    padding: 14px;
+  }
+
+  .treatment-card h4 {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .treatment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.market-results {
+  margin-top: 20px;
+}
+
+.market-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.market-summary h2 {
+  font: 700 19px Manrope, sans-serif;
+  color: var(--dark);
+}
+
+.market-summary p,
+.market-source-note p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.market-live-label {
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #e7eee1;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.market-table-wrap {
+  overflow-x: auto;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.market-table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.market-table th,
+.market-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.market-table th {
+  background: #f3f6ef;
+  color: var(--dark);
+  font-weight: 700;
+}
+
+.market-table td {
+  color: #415346;
+}
+
+.market-modal-price {
+  color: var(--green) !important;
+  font-weight: 800;
+}
+
+.market-source-note {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.financial-result {
+  margin-top: 20px;
+}
+
+.financial-result h2 {
+  font: 700 19px Manrope, sans-serif;
+  color: var(--dark);
+  margin-bottom: 18px;
+}
+
+.financial-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.financial-result-grid > div {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  background: #f3f6ef;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.financial-result-grid span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.financial-result-grid strong {
+  color: var(--green);
+  font-size: 19px;
+}
+
+@media (max-width: 600px) {
+  .financial-result-grid {
+    grid-template-columns: 1fr;
+  }
 }

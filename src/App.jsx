@@ -1,6 +1,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
+import { getDiseaseTreatments } from "./services/treatmentService";
+import { getMarketPrices } from "./services/marketService";
+import { calculateFinancialLoss } from "./services/financialService";
 import "./App.css";
 
 const crops = ["Banana", "Coconut"];
@@ -28,6 +31,7 @@ const labels = {
     marketText:
       "Market price data is not connected yet. Connect a verified source such as AGMARKNET before displaying prices or trends.",
     profileText: "Update your farmer information.",
+    financial: "Financial estimation",
     name: "Full name",
     phone: "Phone",
     district: "District",
@@ -59,12 +63,25 @@ const labels = {
     recoveryText: "Follow-up photo tracking will be added after diagnosis.",
     back: "Back",
     cameraHint: "Use a clear, well-lit photo of the affected leaf or plant.",
+    financialSubtitle: "Estimate potential revenue loss using your harvest and market price.",
+expectedHarvest: "Expected harvest quantity",
+affectedHarvest: "Affected harvest quantity",
+lossPercent: "Estimated yield loss (%)",
+marketPriceInput: "Market price per unit (₹)",
+quantityUnit: "Quantity unit",
+calculate: "Calculate financial impact",
+expectedRevenue: "Expected revenue without loss",
+lostQuantity: "Estimated lost quantity",
+estimatedLoss: "Estimated revenue loss",
+revenueAfterLoss: "Revenue after estimated loss",
+financialDisclaimer: "This is an estimate based on your inputs, not a guaranteed loss or profit calculation.",
   },
   ta: {
     dashboard: "முகப்பு",
     diagnosis: "பயிர் நோய் கண்டறிதல்",
     market: "சந்தை போக்குகள்",
     profile: "விவசாயி விவரங்கள்",
+    financial: "நிதி இழப்பு மதிப்பீடு",
     welcome: "உங்கள் பண்ணை, சிறந்த தகவல்களுடன்.",
     subtitle: "பயிர் ஆரோக்கியம் மற்றும் சந்தைத் தகவல்கள் ஒரே இடத்தில்.",
     diagnose: "பயிரைச் சோதிக்கவும்",
@@ -113,6 +130,18 @@ const labels = {
     recoveryText: "நோய் கண்டறிதலுக்குப் பிறகு புகைப்படக் கண்காணிப்பு சேர்க்கப்படும்.",
     back: "திரும்பு",
     cameraHint: "பாதிக்கப்பட்ட இலையை அல்லது செடியைத் தெளிவாகப் புகைப்படம் எடுக்கவும்.",
+    financialSubtitle: "உங்கள் அறுவடை மற்றும் சந்தை விலையைப் பயன்படுத்தி வருவாய் இழப்பை மதிப்பிடுங்கள்.",
+expectedHarvest: "எதிர்பார்க்கப்படும் அறுவடை அளவு",
+affectedHarvest: "பாதிக்கப்பட்ட அறுவடை அளவு",
+lossPercent: "மதிப்பிடப்பட்ட மகசூல் இழப்பு (%)",
+marketPriceInput: "ஒரு அலகுக்கான சந்தை விலை (₹)",
+quantityUnit: "அளவு அலகு",
+calculate: "நிதி தாக்கத்தைக் கணக்கிடுங்கள்",
+expectedRevenue: "இழப்புக்கு முந்தைய எதிர்பார்க்கப்படும் வருவாய்",
+lostQuantity: "மதிப்பிடப்பட்ட இழந்த அளவு",
+estimatedLoss: "மதிப்பிடப்பட்ட வருவாய் இழப்பு",
+revenueAfterLoss: "மதிப்பிடப்பட்ட இழப்புக்குப் பிந்தைய வருவாய்",
+financialDisclaimer: "இது நீங்கள் வழங்கிய தகவல்களின் அடிப்படையிலான மதிப்பீடு மட்டுமே; உறுதியான இழப்பு அல்லது லாபக் கணக்கீடு அல்ல.",
   },
 };
 
@@ -159,13 +188,89 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [isError, setIsError] = useState(false);
   const [diagnosisResult, setDiagnosisResult] = useState(null);
-const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
   const galleryRef = useRef(null);
   const t = labels[language];
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const [treatments, setTreatments] = useState([]);
+  const [treatmentsLoading, setTreatmentsLoading] = useState(false);
+  const [treatmentsError, setTreatmentsError] = useState("");
+  const [treatmentLanguageFallback, setTreatmentLanguageFallback] = useState(false);
+  const [marketData, setMarketData] = useState(null);
+const [marketLoading, setMarketLoading] = useState(false);
+const [marketError, setMarketError] = useState("");
+const [selectedDistrict, setSelectedDistrict] = useState("All");
+const [selectedMarket, setSelectedMarket] = useState("All");
+const [financialInputs, setFinancialInputs] = useState({
+  expectedHarvest: "",
+  affectedHarvest: "",
+  estimatedLossPercent: "",
+  marketPrice: "",
+  quantityUnit: "kg",
+});
+
+const [financialResult, setFinancialResult] = useState(null);
+const [financialError, setFinancialError] = useState("");
+const [financialMarketIndex, setFinancialMarketIndex] = useState("0");
+
+  useEffect(() => {
+    if (!diagnosisResult) {
+      setTreatments([]);
+      setTreatmentsError("");
+      setTreatmentLanguageFallback(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadTreatments() {
+      setTreatmentsLoading(true);
+      setTreatmentsError("");
+      setTreatments([]);
+
+      try {
+        const result = await getDiseaseTreatments(
+          diagnosisResult.crop,
+          diagnosisResult.predicted_class,
+          language
+        );
+
+        if (!cancelled) {
+          setTreatments(result.records);
+          setTreatmentLanguageFallback(result.fallback);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTreatmentsError(error.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setTreatmentsLoading(false);
+        }
+      }
+    }
+
+    loadTreatments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [diagnosisResult, language]);
+
+  useEffect(() => {
+    async function testTreatments() {
+      const treatments = await getDiseaseTreatments(
+        "Coconut",
+        "Stem Bleeding",
+        "en"
+      );
+    }
+
+    testTreatments();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -192,6 +297,43 @@ const [diagnosing, setDiagnosing] = useState(false);
       subscription.unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    if (page !== "market" && page !== "financial") return;
+
+    let cancelled = false;
+
+    async function loadMarketPrices() {
+      setMarketLoading(true);
+      setMarketError("");
+
+      try {
+        const result = await getMarketPrices(crop);
+        console.log("AGRISENSE market data:", result);
+console.log("Sample market record:", result.records?.[0]);
+
+        if (!cancelled) {
+          setMarketData(result);
+          setSelectedDistrict("All");
+          setSelectedMarket("All");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMarketError(error.message || "Unable to load market prices.");
+          setMarketData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setMarketLoading(false);
+        }
+      }
+    }
+
+    loadMarketPrices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, crop]);
 
   useEffect(() => {
     if (!user) return;
@@ -649,14 +791,54 @@ const [diagnosing, setDiagnosing] = useState(false);
       </main>
     );
   }
-
   const navItems = [
     { id: "dashboard", icon: "⌂", label: t.dashboard },
     { id: "diagnosis", icon: "⌕", label: t.diagnosis },
     { id: "market", icon: "↗", label: t.market },
+    { id: "financial", icon: "₹", label: t.financial },
     { id: "profile", icon: "○", label: t.profile },
-  ];
+  ];function handleFinancialCalculation(event) {
+    event.preventDefault();
+    setFinancialError("");
+    setFinancialResult(null);
 
+    try {
+      const records = marketData?.records || [];
+      const selectedRecord = records[Number(financialMarketIndex)];
+
+      if (!selectedRecord) {
+        throw new Error("No market price available. Please check the Market Trends page.");
+      }
+
+      const modalPrice = Number(selectedRecord.modal_price);
+
+      if (!Number.isFinite(modalPrice) || modalPrice <= 0) {
+        throw new Error("The selected market does not have a valid modal price.");
+      }
+
+      if (financialInputs.quantityUnit !== "kg") {
+        throw new Error("Please select kilograms (kg) for harvest quantities.");
+      }
+
+      const pricePerKg = modalPrice / 100;
+
+      const result = calculateFinancialLoss({
+        ...financialInputs,
+        marketPrice: pricePerKg,
+      });
+
+      setFinancialResult({
+        ...result,
+        marketName: selectedRecord.market,
+        marketDistrict: selectedRecord.district,
+        marketDate: selectedRecord.arrival_date,
+        modalPricePerQuintal: modalPrice,
+        pricePerKg,
+      });
+    } catch (error) {
+      setFinancialError(error.message);
+    }
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -701,188 +883,583 @@ const [diagnosing, setDiagnosing] = useState(false);
         {page === "diagnosis" && (
           <section className="page-content">
             <div className="section-heading"><div><span className="eyebrow">CROP HEALTH</span><h1>{t.diagnosis}</h1><p>{t.cameraHint}</p></div></div>
-            <div className="diagnosis-layout">
-              <section className="content-card">
-                <label className="field-label">{t.chooseCrop}</label>
-                <div className="crop-select-grid">
-                  {crops.map((item) => <button key={item} className={`crop-choice ${crop === item ? "selected" : ""}`} onClick={() => setCrop(item)}><span>{item === "Banana" ? "🍃" : "🌴"}</span><strong>{language === "ta" ? item === "Banana" ? "வாழை" : "தென்னை" : item}</strong><span className="radio-dot">{crop === item ? "✓" : ""}</span></button>)}
-                </div>
-                <div className="upload-box">
-                  {photo ? <img className="photo-preview" src={photo.url} alt="Selected crop" /> : <div className="upload-placeholder"><span>＋</span><strong>{t.selectPhoto}</strong><p>JPG, PNG or WEBP · up to 10 MB</p></div>}
-                  <div className="upload-actions">
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={openLiveCamera}
-                    >
-                      ▣ Open Camera
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => galleryRef.current?.click()}
-                    >
-                      ▧ {t.gallery}
-                    </button>
-                  </div>
-                  <input
-                    ref={galleryRef}
-                    className="visually-hidden"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={choosePhoto}
-                  />
-                  {cameraError && <p className="alert error">{cameraError}</p>}
-                  {cameraOpen && (
-                    <div className="camera-preview">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{
-                          width: "100%",
-                          maxHeight: "400px",
-                          objectFit: "cover",
-                          borderRadius: "16px",
-                          background: "#111",
-                        }}
-                      />
-                      <div className="upload-actions">
-                        <button
-                          type="button"
-                          className="primary-button"
-                          onClick={captureLivePhoto}
-                        >
-                          Capture Photo
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={closeLiveCamera}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button
-  className="primary-button full-width"
-  disabled={!photo || diagnosing}
-  onClick={analyzeCrop}
->
-  {diagnosing ? "Analyzing..." : t.analyze}
-</button>
-              </section>
+            <div className="diagnosis-page">
+  <div className="diagnosis-layout">
+    {/* LEFT: Crop selection and image upload */}
+    <section className="content-card diagnosis-upload-card">
+      <label className="field-label">{t.chooseCrop}</label>
 
-<section className="content-card result-card">
-  <span className="result-symbol">✳</span>
+      <div className="crop-select-grid">
+        {crops.map((item) => (
+          <button
+            key={item}
+            className={`crop-choice ${crop === item ? "selected" : ""}`}
+            onClick={() => setCrop(item)}
+          >
+            <span>{item === "Banana" ? "🍃" : "🌴"}</span>
+            <strong>
+              {language === "ta"
+                ? item === "Banana" ? "வாழை" : "தென்னை"
+                : item}
+            </strong>
+            <span className="radio-dot">
+              {crop === item ? "✓" : ""}
+            </span>
+          </button>
+        ))}
+      </div>
 
-<span className="eyebrow">ANALYSIS RESULT</span>
-
-{diagnosisResult ? (
-  <>
-    <h2>
-  {language === "ta"
-    ? tamilDiseaseNames[diagnosisResult.predicted_class] ||
-      diagnosisResult.predicted_class
-    : diagnosisResult.predicted_class}
-</h2>
-<p>
-  {language === "ta" ? "பயிர்" : "Crop"}:{" "}
-  {language === "ta"
-    ? tamilCropNames[diagnosisResult.crop] || diagnosisResult.crop
-    : diagnosisResult.crop}
-</p>
-<p>
-  {language === "ta" ? "மாதிரியின் நம்பகத்தன்மை" : "Model confidence"}:{" "}
-  {(diagnosisResult.confidence * 100).toFixed(2)}%
-</p>
-
-    {language === "ta" && diagnosisResult.translationFallback && (
-      <p className="alert">
-        தமிழ் மொழிபெயர்ப்பு தற்காலிகமாக கிடைக்கவில்லை. கீழே உள்ள நோய் பெயர் ஆங்கிலத்தில் காட்டப்படலாம்.
-      </p>
-    )}
-
-    <div className="result-divider" />
-
-    <h3>{language === "ta" ? "கணிப்பு நிகழ்தகவுகள்" : "Prediction probabilities"}</h3>
-
-    {Object.entries(diagnosisResult.probabilities || {})
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, probability]) => (
-        <div key={name} className="probability-row">
-          <div className="probability-label">
-          <span>
-  {language === "ta" ? tamilDiseaseNames[name] || name : name}
-</span>
-            <strong>{(probability * 100).toFixed(1)}%</strong>
+      <div className="upload-box">
+        {photo ? (
+          <img
+            className="photo-preview"
+            src={photo.url}
+            alt="Selected crop"
+          />
+        ) : (
+          <div className="upload-placeholder">
+            <span>＋</span>
+            <strong>{t.selectPhoto}</strong>
+            <p>JPG, PNG or WEBP · up to 10 MB</p>
           </div>
-          <div className="probability-track">
-            <div
-              className="probability-fill"
+        )}
+
+        <div className="upload-actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={openLiveCamera}
+          >
+            ▣ Open Camera
+          </button>
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => galleryRef.current?.click()}
+          >
+            ▧ {t.gallery}
+          </button>
+        </div>
+
+        <input
+          ref={galleryRef}
+          className="visually-hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={choosePhoto}
+        />
+
+        {cameraError && (
+          <p className="alert error">{cameraError}</p>
+        )}
+
+        {cameraOpen && (
+          <div className="camera-preview">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
               style={{
-                width: `${Math.min(100, Math.max(0, probability * 100))}%`,
+                width: "100%",
+                maxHeight: "400px",
+                objectFit: "cover",
+                borderRadius: "16px",
+                background: "#111",
               }}
             />
+
+            <div className="upload-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={captureLivePhoto}
+              >
+                Capture Photo
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeLiveCamera}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <button
+        className="primary-button full-width analyze-button"
+        disabled={!photo || diagnosing}
+        onClick={analyzeCrop}
+      >
+        {diagnosing ? "Analyzing..." : t.analyze}
+      </button>
+    </section>
+
+    {/* RIGHT: AI diagnosis result */}
+    <section className="content-card result-card diagnosis-result-card">
+      <span className="result-symbol">✳</span>
+      <span className="eyebrow">ANALYSIS RESULT</span>
+
+      {diagnosisResult ? (
+        <>
+          <h2>
+            {language === "ta"
+              ? tamilDiseaseNames[diagnosisResult.predicted_class] ||
+                diagnosisResult.predicted_class
+              : diagnosisResult.predicted_class}
+          </h2>
+
+          <p>
+            {language === "ta" ? "பயிர்" : "Crop"}:{" "}
+            {language === "ta"
+              ? tamilCropNames[diagnosisResult.crop] ||
+                diagnosisResult.crop
+              : diagnosisResult.crop}
+          </p>
+
+          <p>
+            {language === "ta"
+              ? "மாதிரியின் நம்பகத்தன்மை"
+              : "Model confidence"}:{" "}
+            {(diagnosisResult.confidence * 100).toFixed(2)}%
+          </p>
+
+          {language === "ta" &&
+            diagnosisResult.translationFallback && (
+              <p className="alert">
+                தமிழ் மொழிபெயர்ப்பு தற்காலிகமாக கிடைக்கவில்லை.
+                கீழே உள்ள நோய் பெயர் ஆங்கிலத்தில் காட்டப்படலாம்.
+              </p>
+            )}
+
+          <div className="result-divider" />
+
+          <h3>
+            {language === "ta"
+              ? "கணிப்பு நிகழ்தகவுகள்"
+              : "Prediction probabilities"}
+          </h3>
+
+          {Object.entries(diagnosisResult.probabilities || {})
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, probability]) => (
+              <div key={name} className="probability-row">
+                <div className="probability-label">
+                  <span>
+                    {language === "ta"
+                      ? tamilDiseaseNames[name] || name
+                      : name}
+                  </span>
+                  <strong>
+                    {(probability * 100).toFixed(1)}%
+                  </strong>
+                </div>
+
+                <div className="probability-track">
+                  <div
+                    className="probability-fill"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(0, probability * 100)
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+
+          <p className="alert">
+            {language === "ta"
+              ? "இது AI கணிப்பு மட்டுமே; உறுதிப்படுத்தப்பட்ட கள நோய் கண்டறிதல் அல்ல. சிகிச்சை அளிப்பதற்கு முன் வேளாண் அலுவலரிடம் ஆலோசனை பெறவும்."
+              : "This is an AI prediction, not a confirmed field diagnosis. Seek advice from an agricultural officer before applying treatments."}
+          </p>
+        </>
+      ) : (
+        <>
+          <h2>
+            {diagnosing
+              ? language === "ta"
+                ? "படம் ஆய்வு செய்யப்படுகிறது..."
+                : "Analyzing crop image..."
+              : language === "ta"
+                ? "உங்கள் நோய் கண்டறிதல் இங்கே தோன்றும்"
+                : "Your diagnosis will appear here"}
+          </h2>
+
+          <p>
+            {diagnosing
+              ? language === "ta"
+                ? "பயிற்றுவிக்கப்பட்ட மாதிரி படத்தை ஆய்வு செய்கிறது."
+                : "The trained model is examining your image."
+              : language === "ta"
+                ? "வாழை அல்லது தென்னையைத் தேர்ந்தெடுத்து, படத்தைப் பதிவேற்றி, பகுப்பாய்வு செய்யவும்."
+                : "Choose Banana or Coconut, upload a photo, and select Analyze image."}
+          </p>
+        </>
+      )}
+
+      {message && (
+        <p className={isError ? "alert error" : "alert"}>
+          {message}
+        </p>
+      )}
+    </section>
+  </div>
+
+  {/* BOTTOM: Full-width treatment recommendations */}
+  <section className="content-card treatment-panel">
+    <div className="treatment-panel-heading">
+      <div>
+        <span className="eyebrow">CROP CARE</span>
+        <h2>
+          {language === "ta"
+            ? "சிகிச்சை பரிந்துரைகள்"
+            : "Treatment recommendations"}
+        </h2>
+        <p>
+          {language === "ta"
+            ? "சரிபார்க்கப்பட்ட ஆதாரங்களின் அடிப்படையிலான வழிகாட்டுதல்"
+            : "Source-based guidance for the detected crop disease"}
+        </p>
+      </div>
+
+      {diagnosisResult && (
+        <span className="treatment-disease-label">
+          {language === "ta"
+            ? tamilDiseaseNames[diagnosisResult.predicted_class] ||
+              diagnosisResult.predicted_class
+            : diagnosisResult.predicted_class}
+        </span>
+      )}
+    </div>
+
+    {!diagnosisResult ? (
+      <div className="treatment-empty">
+        <span>🌱</span>
+        <p>{t.recommendationText}</p>
+      </div>
+    ) : treatmentsLoading ? (
+      <p className="treatment-status">
+        {language === "ta"
+          ? "சிகிச்சை விவரங்கள் ஏற்றப்படுகின்றன..."
+          : "Loading verified treatment records..."}
+      </p>
+    ) : treatmentsError ? (
+      <p className="alert error">{treatmentsError}</p>
+    ) : treatments.length === 0 &&
+    diagnosisResult.predicted_class === "Bud Root Dropping" ? (
+    <div className="treatment-empty">
+      <span>⚠️</span>
+      <p>
+        {language === "ta"
+          ? "இந்த பாதிப்பிற்கான சிகிச்சை வழிகாட்டுதல் இன்னும் சரிபார்க்கப்படவில்லை. எந்தவொரு சிகிச்சையையும் மேற்கொள்வதற்கு முன் வேளாண்மை அலுவலர் அல்லது தென்னைப் பயிர் நிபுணரை அணுகவும்."
+          : "Treatment guidance is not yet verified for this condition. Please consult a local agricultural officer or coconut crop specialist before applying any treatment."}
+      </p>
+    </div>
+  ) : treatments.length === 0 ? (
+    <div className="treatment-empty">
+      <span>ℹ</span>
+      <p>
+        {language === "ta"
+          ? "இந்த நோய்க்கான சரிபார்க்கப்பட்ட சிகிச்சைப் பதிவுகள் இன்னும் கிடைக்கவில்லை."
+          : "No verified treatment records are currently available for this disease."}
+      </p>
+    </div>
+  ) : (
+      <div className="treatment-guidance">
+        {treatmentLanguageFallback && (
+          <p className="alert">
+            Tamil treatment translation is not available yet.
+            Showing the verified English source records.
+          </p>
+        )}
+
+        <div className="treatment-grid">
+          {treatments.map((item) => (
+            <article className="treatment-card" key={item.id}>
+              <span className="treatment-type">
+                {item.treatment_type}
+              </span>
+
+              <h4>{item.product_name || item.treatment_type}</h4>
+
+              {item.concentration && (
+                <span className="treatment-concentration">
+                  {item.concentration}
+                </span>
+              )}
+
+              <p className="treatment-source">
+                {item.source_name}
+              </p>
+
+              <details className="treatment-details">
+                <summary>
+                  {language === "ta" ? "விவரங்கள்" : "View details"}
+                </summary>
+
+                {item.active_ingredient && (
+                  <p>
+                    <strong>
+                      {language === "ta"
+                        ? "செயல்படும் மூலப்பொருள்"
+                        : "Active ingredient"}:
+                    </strong>{" "}
+                    {item.active_ingredient}
+                  </p>
+                )}
+
+                <p>
+                  <strong>
+                    {language === "ta"
+                      ? "பயன்படுத்தும் முறை"
+                      : "Application method"}:
+                  </strong>{" "}
+                  {item.application_method}
+                </p>
+
+                <p>
+                  <strong>
+                    {language === "ta"
+                      ? "முன்னெச்சரிக்கைகள்"
+                      : "Precautions"}:
+                  </strong>{" "}
+                  {item.precautions}
+                </p>
+
+                {item.source_url && (
+                  <a
+                    href={item.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {language === "ta"
+                      ? "ஆதாரத்தைப் பார்க்க"
+                      : "View official source"}
+                  </a>
+                )}
+
+                <small>
+                  {language === "ta"
+                    ? "சரிபார்க்கப்பட்ட தேதி"
+                    : "Source checked"}:{" "}
+                  {item.last_verified || "Not recorded"}
+                </small>
+              </details>
+            </article>
+          ))}
+        </div>
+
+        <p className="alert treatment-safety-note">
+          {language === "ta"
+            ? "இந்தத் தகவல்கள் ஆதார அடிப்படையிலான வழிகாட்டுதல்கள் மட்டுமே. பயன்படுத்துவதற்கு முன் தற்போதைய தயாரிப்பு லேபிள் மற்றும் வேளாண் அலுவலரின் ஆலோசனையைச் சரிபார்க்கவும்."
+            : "These are source-based recommendations, not individual prescriptions. Check current product registration, label directions and consult an agricultural officer before application."}
+        </p>
+      </div>
+    )}
+  </section>
+</div>
+          </section>
+        )}
+{page === "market" && (
+  <section className="page-content">
+    <div className="section-heading">
+      <div>
+        <span className="eyebrow">MARKET INTELLIGENCE</span>
+        <h1>{t.market}</h1>
+        <p>
+          {language === "ta"
+            ? "வாழை மற்றும் தேங்காயின் சமீபத்திய சந்தை விலைகளை ஒப்பிடுங்கள்."
+            : "Compare the latest reported Banana and Coconut market prices."}
+        </p>
+      </div>
+    </div>
+
+    <div className="market-filter">
+      <label>
+        {t.chooseCrop}
+        <select
+          value={crop}
+          onChange={(event) => setCrop(event.target.value)}
+        >
+          <option value="Banana">Banana / வாழை</option>
+          <option value="Coconut">Coconut / தென்னை</option>
+        </select>
+      </label>
+
+      <label>
+        {language === "ta" ? "மாவட்டம்" : "District"}
+        <select
+          value={selectedDistrict}
+          onChange={(event) => {
+            setSelectedDistrict(event.target.value);
+            setSelectedMarket("All");
+          }}
+        >
+          <option value="All">
+            {language === "ta" ? "அனைத்து மாவட்டங்களும்" : "All districts"}
+          </option>
+          {[...new Set(
+            (marketData?.records || [])
+              .map((record) => record.district)
+              .filter(Boolean)
+          )].sort().map((district) => (
+            <option key={district} value={district}>
+              {district}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        {language === "ta" ? "சந்தை" : "Market"}
+        <select
+          value={selectedMarket}
+          onChange={(event) => setSelectedMarket(event.target.value)}
+        >
+          <option value="All">
+            {language === "ta" ? "அனைத்து சந்தைகளும்" : "All markets"}
+          </option>
+          {[...new Set(
+            (marketData?.records || [])
+              .filter(
+                (record) =>
+                  selectedDistrict === "All" ||
+                  record.district === selectedDistrict
+              )
+              .map((record) => record.market)
+              .filter(Boolean)
+          )].sort().map((market) => (
+            <option key={market} value={market}>
+              {market}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+
+    {marketLoading && (
+      <div className="market-empty">
+        {language === "ta"
+          ? "சந்தை விலைகள் ஏற்றப்படுகின்றன..."
+          : "Loading latest market prices..."}
+      </div>
+    )}
+
+    {marketError && (
+      <div className="market-empty">
+        <h2>{language === "ta" ? "தரவை ஏற்ற முடியவில்லை" : "Unable to load prices"}</h2>
+        <p>{marketError}</p>
+      </div>
+    )}
+
+    {!marketLoading && !marketError && marketData && (() => {
+      const filteredRecords = marketData.records.filter((record) => {
+        const districtMatches =
+          selectedDistrict === "All" ||
+          record.district === selectedDistrict;
+
+        const marketMatches =
+          selectedMarket === "All" ||
+          record.market === selectedMarket;
+
+        return districtMatches && marketMatches;
+      });
+
+      const formatPrice = (value) => {
+        const number = Number(value);
+        return Number.isFinite(number)
+          ? number.toLocaleString("en-IN")
+          : "—";
+      };
+
+      return (
+        <div className="market-results">
+          <div className="market-summary">
+            <div>
+              <h2>
+                {language === "ta"
+                  ? "சமீபத்திய சந்தை விலைகள்"
+                  : "Latest market prices"}
+              </h2>
+              <p>
+                {language === "ta"
+                  ? `காட்டப்படும் பதிவுகள்: ${filteredRecords.length}`
+                  : `Showing ${filteredRecords.length} records from ${marketData.total} matching records`}
+              </p>
+            </div>
+            <span className="market-live-label">
+              {language === "ta" ? "ஆதாரத் தரவு" : "Source data"}
+            </span>
+          </div>
+
+          {filteredRecords.length === 0 ? (
+            <div className="market-empty">
+              {language === "ta"
+                ? "இந்த வடிகட்டலுக்கு விலைப் பதிவுகள் இல்லை."
+                : "No price records match these filters."}
+            </div>
+          ) : (
+            <div className="market-table-wrap">
+              <table className="market-table">
+                <thead>
+                  <tr>
+                    <th>{language === "ta" ? "மாவட்டம்" : "District"}</th>
+                    <th>{language === "ta" ? "சந்தை" : "Market"}</th>
+                    <th>{language === "ta" ? "வகை" : "Variety"}</th>
+                    <th>{language === "ta" ? "தேதி" : "Arrival date"}</th>
+                    <th>{language === "ta" ? "குறைந்தபட்ச விலை" : "Minimum"}</th>
+                    <th>{language === "ta" ? "அதிகபட்ச விலை" : "Maximum"}</th>
+                    <th>{language === "ta" ? "சராசரி சந்தை விலை" : "Modal price"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRecords.map((record, index) => (
+                    <tr key={`${record.market}-${record.variety}-${index}`}>
+                      <td>{record.district || "—"}</td>
+                      <td>{record.market || "—"}</td>
+                      <td>{record.variety || "—"}</td>
+                      <td>{record.arrival_date || "—"}</td>
+                      <td>{formatPrice(record.min_price)}</td>
+                      <td>{formatPrice(record.max_price)}</td>
+                      <td className="market-modal-price">
+                        {formatPrice(record.modal_price)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="market-source-note">
+            <p>
+              {language === "ta"
+                ? "ஆதாரம்: data.gov.in. விலையின் அலகு மூலத் தரவில் உள்ளபடியே காட்டப்படுகிறது; உறுதிப்படுத்தப்படவில்லை."
+                : "Source: data.gov.in. Price unit is displayed as reported by the source and has not yet been independently verified."}
+            </p>
+            <p>
+              {language === "ta" ? "கடைசியாகப் புதுப்பிக்கப்பட்டது: " : "Source last updated: "}
+              {marketData.lastUpdated || "Not provided"}
+            </p>
+            <p>
+              {language === "ta" ? "பெறப்பட்ட நேரம்: " : "Fetched at: "}
+              {marketData.fetchedAt
+                ? new Date(marketData.fetchedAt).toLocaleString()
+                : "Not provided"}
+            </p>
           </div>
         </div>
-      ))}
-
-    <p className="alert">
-      {language === "ta"
-        ? "இது AI கணிப்பு மட்டுமே; உறுதிப்படுத்தப்பட்ட கள நோய் கண்டறிதல் அல்ல. சிகிச்சை அளிப்பதற்கு முன் வேளாண் அலுவலரிடம் ஆலோசனை பெறவும்."
-        : "This is an AI prediction, not a confirmed field diagnosis. Seek advice from an agricultural officer before applying treatments."}
-    </p>
-  </>
-) : (
-  <>
-    <h2>
-      {diagnosing
-        ? language === "ta" ? "படம் ஆய்வு செய்யப்படுகிறது..." : "Analyzing crop image..."
-        : language === "ta" ? "உங்கள் நோய் கண்டறிதல் இங்கே தோன்றும்" : "Your diagnosis will appear here"}
-    </h2>
-    <p>
-      {diagnosing
-        ? language === "ta" ? "பயிற்றுவிக்கப்பட்ட மாதிரி படத்தை ஆய்வு செய்கிறது." : "The trained model is examining your image."
-        : language === "ta"
-          ? "வாழை அல்லது தென்னையைத் தேர்ந்தெடுத்து, படத்தைப் பதிவேற்றி, பகுப்பாய்வு செய்யவும்."
-          : "Choose Banana or Coconut, upload a photo, and select Analyze image."}
-    </p>
-  </>
+      );
+    })()}
+  </section>
 )}
-
-<div className="result-divider" />
-
-<h3>{t.recommendation}</h3>
-<p>{t.recommendationText}</p>
-
-
-  {message && (
-    <p className={isError ? "alert error" : "alert"}>
-      {message}
-    </p>
-  )}
-</section>
-
-            </div>
-          </section>
-        )}
-
-        {page === "market" && (
-          <section className="page-content">
-            <div className="section-heading"><div><span className="eyebrow">MARKET INTELLIGENCE</span><h1>{t.market}</h1><p>Understand price movement before making selling decisions.</p></div></div>
-            <div className="market-filter">
-              <label>{t.chooseCrop}<select value={crop} onChange={(event) => setCrop(event.target.value)}><option value="Banana">Banana / வாழை</option><option value="Coconut">Coconut / தென்னை</option></select></label>
-              <label>Market data source<select value="pending" disabled><option value="pending">Not connected</option></select></label>
-            </div>
-            <div className="market-empty">
-              <span className="chart-icon">↗</span><h2>Market data connection required</h2><p>{t.marketText}</p><div className="empty-chart"><span>Price</span><div className="chart-grid-lines" /><span>Date →</span></div><small>No price values or trend are displayed until verified data is available.</small>
-            </div>
-          </section>
-        )}
 
         {page === "profile" && (
           <section className="page-content">
@@ -900,6 +1477,231 @@ const [diagnosing, setDiagnosing] = useState(false);
             </form>
           </section>
         )}
+{page === "financial" && (
+  <section className="page-content">
+    <div className="section-heading">
+      <div>
+        <span className="eyebrow">FARM FINANCIAL TOOLS</span>
+        <h1>{t.financial}</h1>
+        <p>{t.financialSubtitle}</p>
+      </div>
+    </div>
+
+    <form
+      className="content-card profile-form"
+      onSubmit={handleFinancialCalculation}
+    >
+      <label>
+        {t.chooseCrop}
+        <select
+          value={crop}
+          onChange={(event) => {
+            setCrop(event.target.value);
+            setFinancialResult(null);
+            setFinancialMarketIndex("0");
+          }}
+        >
+          <option value="Banana">Banana / வாழை</option>
+          <option value="Coconut">Coconut / தென்னை</option>
+        </select>
+      </label>
+
+      <label>
+        Select market
+        <select
+          value={financialMarketIndex}
+          onChange={(event) => {
+            setFinancialMarketIndex(event.target.value);
+            setFinancialResult(null);
+          }}
+          required
+          disabled={!marketData?.records?.length}
+        >
+          {marketData?.records?.map((record, index) => (
+            <option key={`${record.market}-${index}`} value={String(index)}>
+              {record.market} — {record.district}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {marketLoading && <p>Loading government market prices...</p>}
+
+      {marketError && (
+        <p className="alert error">{marketError}</p>
+      )}
+
+      {!marketLoading && !marketError && marketData?.records?.length > 0 && (
+        <div className="content-card">
+          <p>
+            Selected modal price: ₹
+            {Number(
+              marketData.records[Number(financialMarketIndex)]?.modal_price
+            ).toLocaleString("en-IN")}
+            /quintal
+          </p>
+          <p>
+            Market: {marketData.records[Number(financialMarketIndex)]?.market}
+          </p>
+          <p>
+            District: {marketData.records[Number(financialMarketIndex)]?.district}
+          </p>
+          <p>
+            Date: {marketData.records[Number(financialMarketIndex)]?.arrival_date}
+          </p>
+          <p>
+            Calculated price: ₹
+            {(
+              Number(
+                marketData.records[Number(financialMarketIndex)]?.modal_price
+              ) / 100
+            ).toFixed(2)}
+            /kg
+          </p>
+          <p className="market-source-note">
+            Source: data.gov.in. For this project, the modal price is
+            assumed to be per quintal and converted to per kg.
+          </p>
+        </div>
+      )}
+
+      {!marketLoading && !marketError && !marketData?.records?.length && (
+        <p className="alert error">
+          No market prices are currently available for this crop.
+        </p>
+      )}
+
+      <label>
+        {t.expectedHarvest} (kg)
+        <input
+          type="number"
+          min="0.01"
+          step="any"
+          required
+          value={financialInputs.expectedHarvest}
+          onChange={(event) => setFinancialInputs({
+            ...financialInputs,
+            expectedHarvest: event.target.value,
+          })}
+        />
+      </label>
+
+      <label>
+        {t.affectedHarvest} (kg)
+        <input
+          type="number"
+          min="0"
+          step="any"
+          required
+          value={financialInputs.affectedHarvest}
+          onChange={(event) => setFinancialInputs({
+            ...financialInputs,
+            affectedHarvest: event.target.value,
+          })}
+        />
+      </label>
+
+      <label>
+        {t.lossPercent}
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="any"
+          required
+          value={financialInputs.estimatedLossPercent}
+          onChange={(event) => setFinancialInputs({
+            ...financialInputs,
+            estimatedLossPercent: event.target.value,
+          })}
+        />
+      </label>
+
+      {financialError && (
+        <p className="alert error">{financialError}</p>
+      )}
+
+      <button
+        className="primary-button"
+        type="submit"
+        disabled={
+          marketLoading ||
+          !marketData?.records?.length ||
+          !marketData.records[Number(financialMarketIndex)]
+        }
+      >
+        {t.calculate}
+      </button>
+    </form>
+
+    {financialResult && (
+      <div className="content-card financial-result">
+        <h2>{t.financial}</h2>
+
+        <p>
+          Market: {financialResult.marketName},{" "}
+          {financialResult.marketDistrict}
+        </p>
+        <p>Date: {financialResult.marketDate}</p>
+        <p>
+          Government modal price: ₹
+          {financialResult.modalPricePerQuintal.toLocaleString("en-IN")}
+          /quintal
+        </p>
+        <p>
+          Converted price: ₹
+          {financialResult.pricePerKg.toFixed(2)}/kg
+        </p>
+
+        <div className="financial-result-grid">
+          <div>
+            <span>{t.expectedRevenue}</span>
+            <strong>
+              ₹{financialResult.expectedRevenue.toLocaleString("en-IN", {
+                maximumFractionDigits: 2,
+              })}
+            </strong>
+          </div>
+
+          <div>
+            <span>{t.lostQuantity}</span>
+            <strong>
+              {financialResult.lostQuantity.toLocaleString("en-IN", {
+                maximumFractionDigits: 2,
+              })} kg
+            </strong>
+          </div>
+
+          <div>
+            <span>{t.estimatedLoss}</span>
+            <strong>
+              ₹{financialResult.estimatedRevenueLoss.toLocaleString("en-IN", {
+                maximumFractionDigits: 2,
+              })}
+            </strong>
+          </div>
+
+          <div>
+            <span>{t.revenueAfterLoss}</span>
+            <strong>
+              ₹{financialResult.revenueAfterLoss.toLocaleString("en-IN", {
+                maximumFractionDigits: 2,
+              })}
+            </strong>
+          </div>
+        </div>
+
+        <p className="market-source-note">
+          Financial estimate based on the selected government modal price.
+          The ₹/quintal unit is a project assumption and has not been
+          confirmed in the API metadata. Yield-loss percentage is
+          user-provided, not an AI prediction.
+        </p>
+      </div>
+    )}
+  </section>
+)}
+
 
         <footer className="app-footer">AGRISENSE · Crop health and farmer welfare</footer>
       </main>

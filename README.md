@@ -1,5 +1,16 @@
 # React + Vite
 
+## Supabase user accounts
+
+Apply [`supabase/migrations/20261029195500_create_users_table.sql`](./supabase/migrations/20261029195500_create_users_table.sql)
+to your Supabase project (for example, in the Supabase SQL Editor). It creates
+`public.users` and a database trigger that records each new auth user's name,
+email, preferred language, and signup time. Existing auth users are backfilled
+when the migration runs.
+
+The signup form currently collects a name, email, and password. Additional
+farmer details are stored separately in `public.farmer_profiles`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
